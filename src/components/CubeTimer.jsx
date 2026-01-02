@@ -1,100 +1,46 @@
 import React from 'react';
-import { RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { formatTime } from '../utils/helpers';
 
-export default function CubeTimer({ 
-    time, 
-    timerStatus, 
-    scramble,
-    onNewScramble
-}) {
-    // Logic to display time (shows 0.00 if idle, formatted time otherwise)
-    const getDisplayTime = () => {
-        return formatTime(time);
-    };
+const THEME_STYLES = {
+    indigo: { text: 'text-indigo-400', glass: 'bg-indigo-500/10 border-indigo-500/20' },
+    emerald: { text: 'text-emerald-400', glass: 'bg-emerald-500/10 border-emerald-500/20' },
+    rose: { text: 'text-rose-400', glass: 'bg-rose-500/10 border-rose-500/20' },
+    amber: { text: 'text-amber-400', glass: 'bg-amber-500/10 border-amber-500/20' },
+};
 
-    // Logic to split scramble into readable rows
-    const renderScrambleText = () => {
-        if (!scramble) return <span className="text-gray-700 animate-pulse">Generating...</span>;
-        
-        // Split long scrambles into chunks of 10 moves for better readability
-        const moves = scramble.split(' ');
-        const rows = [];
-        for (let i = 0; i < moves.length; i += 10) rows.push(moves.slice(i, i + 10).join(' '));
-        
-        return (
-            <div className="flex flex-col items-center justify-center w-full text-center">
-                {rows.map((row, i) => (
-                    <span key={i} className="block leading-tight text-gray-300">{row}</span>
-                ))}
-            </div>
-        );
-    };
-
-    // Dynamic Colors based on status
-    let timerColor = 'text-gray-100';
-    if (timerStatus === 'ready') timerColor = 'text-[#22c55e]';   // Green
-    if (timerStatus === 'holding') timerColor = 'text-[#E65F5F]'; // Red
-
+export default function CubeTimer({ time, isInspecting, timerStatus, scramble, onNewScramble, themeColor }) {
+    const activeStyle = THEME_STYLES[themeColor] || THEME_STYLES.indigo;
     const isRunning = timerStatus === 'running';
 
-    // UI Fade Style (Dim the controls when timer is running)
-    const fadeStyle = {
-        opacity: isRunning ? 0 : 1,
-        transition: 'opacity 0.2s ease-in-out',
-        pointerEvents: isRunning ? 'none' : 'auto'
-    };
+    let timerColor = 'text-gray-100';
+    if (isInspecting) timerColor = activeStyle.text;
+    else if (timerStatus === 'ready') timerColor = 'text-[#22c55e]';
+    else if (timerStatus === 'holding') timerColor = 'text-[#E65F5F]';
 
     return (
         <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
-            {/* HEADER CONTROLS (Pill Shape) */}
-            <div 
-                className="flex justify-center pt-8 mb-2 transition-all duration-300"
-                style={fadeStyle}
-            >
-                <div className="flex items-center bg-gray-800 border border-gray-700 rounded-lg p-0.5 shadow-sm z-20">
-                    <div className="px-2.5 py-1 text-[10px] font-bold text-gray-400 uppercase tracking-wider border-r border-gray-700 mr-1 select-none">
-                        3x3 WCA
-                    </div>
-                    <button 
-                        onClick={(e) => { e.currentTarget.blur(); onNewScramble(); }} 
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md cursor-pointer transition-colors"
-                    >
-                        <RefreshCw size={14} />
-                    </button>
-                    <button 
-                        className="p-1.5 text-gray-400 hover:text-white hover:bg-gray-700 rounded-md cursor-pointer transition-colors"
-                    >
-                        <SettingsIcon size={14} />
-                    </button>
+            <div className="flex justify-center pt-8 mb-2" style={{ opacity: isRunning ? 0 : 1, transition: '0.2s' }}>
+                <div className={`flex items-center ${activeStyle.glass} backdrop-blur-md border rounded-xl p-1 shadow-2xl`}>
+                    <div className="px-3 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-r border-white/10 mr-1">3x3 WCA</div>
+                    <button onClick={onNewScramble} className="p-2 text-gray-400 hover:text-white rounded-lg cursor-pointer"><RefreshCw size={16} /></button>
                 </div>
             </div>
 
-            {/* SCRAMBLE TEXT */}
-            <div 
-                className="flex justify-center w-full px-4 mt-12 mb-2 select-none transition-all duration-300 min-h-[60px]"
-                style={fadeStyle}
-            >
-                <h2 className="font-mono text-lg md:text-2xl text-gray-300 tracking-wide leading-relaxed text-center">
-                    {renderScrambleText()}
+            <div className="flex justify-center w-full px-4 mt-12 mb-2 select-none min-h-[60px]" style={{ opacity: isRunning ? 0 : 1, transition: '0.2s' }}>
+                <h2 className="font-mono text-lg md:text-2xl text-gray-300 text-center tracking-wide leading-relaxed">
+                    {scramble}
                 </h2>
             </div>
 
-            {/* MAIN TIMER NUMBERS */}
             <div className="flex justify-center mt-8 mb-12 w-full">
                 <div className={`font-mono text-7xl md:text-9xl font-bold tabular-nums tracking-tighter select-none transition-colors duration-200 ${timerColor} text-center`}>
-                    {getDisplayTime()}
+                    {isInspecting ? time : formatTime(time)}
                 </div>
             </div>
 
-            {/* HINT TEXT */}
-            <div 
-                style={fadeStyle}
-                className="pb-2 text-center text-indigo-400 text-[10px] font-medium uppercase tracking-widest select-none transition-opacity duration-200"
-            >
-                <span>
-                    {timerStatus === 'holding' ? 'Hold...' : timerStatus === 'ready' ? 'Release to Solve' : 'Hold Space to Start'}
-                </span>
+            <div className={`pb-2 text-center ${activeStyle.text} text-[10px] font-bold uppercase tracking-[0.3em] transition-opacity duration-200 ${isRunning ? 'opacity-0' : 'opacity-100'}`}>
+                {isInspecting ? 'Inspect Now' : (timerStatus === 'holding' ? 'Hold...' : timerStatus === 'ready' ? 'Release to Solve' : 'Hold Space to Start')}
             </div>
         </div>
     );
