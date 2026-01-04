@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react'; // 1. Import Hooks
 import { RefreshCw } from 'lucide-react';
 import { formatTime } from '../utils/helpers';
 
@@ -13,10 +13,26 @@ export default function CubeTimer({ time, isInspecting, timerStatus, scramble, o
     const activeStyle = THEME_STYLES[themeColor] || THEME_STYLES.indigo;
     const isRunning = timerStatus === 'running';
 
+    // 2. Local state to hold the previous time
+    const [lastValidTime, setLastValidTime] = useState(0);
+
+    // 3. Effect to capture the time whenever it is active (greater than 0)
+    useEffect(() => {
+        if (time > 0) {
+            setLastValidTime(time);
+        }
+    }, [time]);
+
     let timerColor = 'text-gray-100';
     if (isInspecting) timerColor = activeStyle.text;
     else if (timerStatus === 'ready') timerColor = 'text-[#22c55e]';
     else if (timerStatus === 'holding') timerColor = 'text-[#E65F5F]';
+
+    // 4. Determine what to display
+    // If inspecting, show inspection time.
+    // If running or the current time is > 0 (solve just finished), show current time.
+    // Otherwise (idle/holding/ready with time 0), show the remembered lastValidTime.
+    const timeToDisplay = (isInspecting || isRunning || time > 0) ? time : lastValidTime;
 
     return (
         <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
@@ -35,7 +51,8 @@ export default function CubeTimer({ time, isInspecting, timerStatus, scramble, o
 
             <div className="flex justify-center mt-8 mb-12 w-full">
                 <div className={`font-mono text-7xl md:text-9xl font-bold tabular-nums tracking-tighter select-none transition-colors duration-200 ${timerColor} text-center`}>
-                    {isInspecting ? time : formatTime(time)}
+                    {/* Updated display logic here */}
+                    {isInspecting ? time : formatTime(timeToDisplay)}
                 </div>
             </div>
 
