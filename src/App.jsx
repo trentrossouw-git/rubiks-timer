@@ -1,13 +1,24 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import useLocalStorage from './hooks/useLocalStorage'; // IMPORT THE NEW HOOK
 import CubeTimer from './components/CubeTimer';
 import CubeVisualizer from './components/CubeVisualizer';
 import Settings from './pages/Settings';
 import { STD_SOLVED } from './utils/constants';
 import { generateRandomMoves, applyMove, cloneCube } from './utils/cubeLogic';
 
-// Helper to switch theme styles based on Light/Dark mode
+// Default Settings Object
+const DEFAULT_SETTINGS = {
+    themeColor: 'indigo',
+    isDarkMode: true,
+    showVisualizer: true,
+    useInspection: false,
+    inspectionHotkey: 'KeyI',
+    timerHotkey: 'Space',
+    holdDuration: 550,
+    dailyGoal: 50 // New: For the pet feature later!
+};
+
 const getGlassClasses = (color, isDark) => {
-    // Dark Mode Styles (Original)
     if (isDark) {
         switch (color) {
             case 'indigo': return 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400';
@@ -17,7 +28,6 @@ const getGlassClasses = (color, isDark) => {
             default: return 'bg-indigo-500/10 border-indigo-500/20 text-indigo-400';
         }
     }
-    // Light Mode Styles (Darker text, lighter backgrounds)
     switch (color) {
         case 'indigo': return 'bg-indigo-500/10 border-indigo-500/30 text-indigo-600';
         case 'emerald': return 'bg-emerald-500/10 border-emerald-500/30 text-emerald-600';
@@ -30,23 +40,19 @@ const getGlassClasses = (color, isDark) => {
 export default function App() {
   const [view, setView] = useState('timer');
   
-  // --- SETTINGS STATE ---
-  const [themeColor, setThemeColor] = useState('indigo');
-  const [isDarkMode, setIsDarkMode] = useState(true); // New
-  const [showVisualizer, setShowVisualizer] = useState(true); // New
-  
-  const [useInspection, setUseInspection] = useState(false);
-  const [inspectionHotkey, setInspectionHotkey] = useState('KeyI'); // Default: 'i'
-  const [timerHotkey, setTimerHotkey] = useState('Space'); // Default: Space
-  const [holdDuration, setHoldDuration] = useState(550); // Default: 550ms
+  // --- PERSISTENT STATE (Saved to Browser) ---
+  const [settings, setSettings] = useLocalStorage('cube_settings', DEFAULT_SETTINGS);
+  const [solves, setSolves] = useLocalStorage('cube_solves', []); // Array to store history
+  const [wallet, setWallet] = useLocalStorage('cube_wallet', { cubes: 0 }); // New: For the Pet!
 
-  // --- TIMER STATE ---
+  // Helper adapters to keep your Settings.jsx compatible
+  const updateSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
+
+  // --- TEMP STATE (Reset on Refresh) ---
   const [time, setTime] = useState(0); 
   const [inspectionTime, setInspectionTime] = useState(15000); 
   const [penalty, setPenalty] = useState(null); 
   const [timerStatus, setTimerStatus] = useState('idle'); 
-  
-  // --- CUBE STATE ---
   const [scramble, setScramble] = useState('Generating...');
   const [cubeState, setCubeState] = useState(STD_SOLVED);
 
@@ -57,8 +63,7 @@ export default function App() {
 
   const isFocusMode = timerStatus === 'running' || timerStatus === 'inspecting';
 
-  // --- Scramble Logic ---
-  const handleNewScramble = () => {
+  const handleNewScramble = useCallback(() => {
     const movesString = generateRandomMoves(20);
     setScramble(movesString);
     let state = cloneCube(STD_SOLVED);
@@ -67,11 +72,11 @@ export default function App() {
     setCubeState(state);
     setTimerStatus('idle');
     setPenalty(null);
-  };
+  }, []);
 
-  useEffect(() => { handleNewScramble(); }, []);
+  useEffect(() => { handleNewScramble(); }, [handleNewScramble]);
 
-  // --- Main Solve Timer ---
+  // --- MAIN SOLVE LOGIC ---
   const startSolve = () => {
     setTimerStatus('running');
     setPenalty(null); 
@@ -86,10 +91,23 @@ export default function App() {
 
   const stopSolve = () => {
     cancelAnimationFrame(requestRef.current);
+    const finalTime = Date.now() - startTimeRef.current;
     setTimerStatus('finished');
+    
+    // SAVE THE SOLVE
+    const newSolve = {
+        id: Date.now(), // Unique ID
+        time: finalTime,
+        scramble: scramble,
+        date: new Date().toISOString(),
+        penalty: null // No penalty for normal finish
+    };
+    
+    setSolves(prev => [newSolve, ...prev]);
+    // Note: This is where we will eventually add: setWallet(prev => ({ cubes: prev.cubes + 5 }));
   };
 
-  // --- Inspection Timer ---
+  // --- INSPECTION LOGIC ---
   const startInspection = () => {
     setTimerStatus('inspecting');
     setInspectionTime(15000);
@@ -106,6 +124,9 @@ export default function App() {
         cancelAnimationFrame(requestRef.current);
         setTimerStatus('finished');
         setPenalty('DNS'); 
+        
+        // Save DNS (Did Not Start) to history? Optional. 
+        // Usually DNS is not saved in stats, but let's leave it out for now.
       } else {
         requestRef.current = requestAnimationFrame(animateInspection);
       }
@@ -119,52 +140,48 @@ export default function App() {
     setInspectionTime(15000);
   };
 
-  // --- Input Handling ---
+  // --- INPUT HANDLING ---
   useEffect(() => {
     if (view !== 'timer') return;
 
     const handleKeyDown = (e) => {
-      // 1. Inspection Hotkey
-      if (useInspection && e.code === inspectionHotkey) {
+      if (settings.useInspection && e.code === settings.inspectionHotkey) {
         if (timerStatus === 'idle') startInspection();
         else if (timerStatus === 'inspecting') cancelInspection();
         return;
       }
 
-      // 2. Start Timer Hotkey (User Defined)
-      if (e.code === timerHotkey) {
+      if (e.code === settings.timerHotkey) {
         if (timerStatus === 'running') {
           stopSolve();
         } 
-        else if (timerStatus === 'idle' && !useInspection) {
+        else if (timerStatus === 'idle' && !settings.useInspection) {
            setTimerStatus('holding');
-           // Use dynamic hold duration
-           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), holdDuration);
+           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), settings.holdDuration);
         }
         else if (timerStatus === 'inspecting') {
            setTimerStatus('holding');
-           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), holdDuration);
+           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), settings.holdDuration);
         }
         else if (timerStatus === 'finished') {
            setTimerStatus('holding');
-           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), holdDuration);
+           holdTimeoutRef.current = setTimeout(() => setTimerStatus('ready'), settings.holdDuration);
         }
       }
 
-      // Settings Shortcut
       if (e.key.toLowerCase() === 's' && !isFocusMode && timerStatus !== 'holding' && timerStatus !== 'ready') {
         setView('settings');
       }
     };
 
     const handleKeyUp = (e) => {
-      if (e.code === timerHotkey) {
+      if (e.code === settings.timerHotkey) {
         if (timerStatus === 'ready') {
             if (requestRef.current) cancelAnimationFrame(requestRef.current);
             startSolve();
         } else if (timerStatus === 'holding') {
           clearTimeout(holdTimeoutRef.current);
-          if (useInspection && inspectionTime > -2000) setTimerStatus('inspecting'); 
+          if (settings.useInspection && inspectionTime > -2000) setTimerStatus('inspecting'); 
           else setTimerStatus('idle');
         } else if (timerStatus === 'finished') {
            handleNewScramble();
@@ -178,26 +195,26 @@ export default function App() {
       window.removeEventListener('keydown', handleKeyDown);
       window.removeEventListener('keyup', handleKeyUp);
     };
-  }, [timerStatus, view, useInspection, inspectionHotkey, timerHotkey, holdDuration, inspectionTime, isFocusMode]);
+  }, [timerStatus, view, settings, inspectionTime, isFocusMode]);
 
   if (view === 'settings') {
     return (
         <Settings 
             onBack={() => setView('timer')} 
-            themeColor={themeColor} setThemeColor={setThemeColor} 
-            isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode}
-            showVisualizer={showVisualizer} setShowVisualizer={setShowVisualizer}
-            useInspection={useInspection} setUseInspection={setUseInspection}
-            inspectionHotkey={inspectionHotkey} setInspectionHotkey={setInspectionHotkey}
-            timerHotkey={timerHotkey} setTimerHotkey={setTimerHotkey}
-            holdDuration={holdDuration} setHoldDuration={setHoldDuration}
+            // Pass adapters to maintain compatibility with Settings.jsx
+            themeColor={settings.themeColor} setThemeColor={(v) => updateSetting('themeColor', v)}
+            isDarkMode={settings.isDarkMode} setIsDarkMode={(v) => updateSetting('isDarkMode', v)}
+            showVisualizer={settings.showVisualizer} setShowVisualizer={(v) => updateSetting('showVisualizer', v)}
+            useInspection={settings.useInspection} setUseInspection={(v) => updateSetting('useInspection', v)}
+            inspectionHotkey={settings.inspectionHotkey} setInspectionHotkey={(v) => updateSetting('inspectionHotkey', v)}
+            timerHotkey={settings.timerHotkey} setTimerHotkey={(v) => updateSetting('timerHotkey', v)}
+            holdDuration={settings.holdDuration} setHoldDuration={(v) => updateSetting('holdDuration', v)}
         />
     );
   }
 
-  // Determine Background Colors based on Dark Mode
-  const bgClass = isDarkMode ? 'bg-[#0a0e13] text-gray-100' : 'bg-gray-50 text-gray-900';
-  const glassButtonClass = getGlassClasses(themeColor, isDarkMode);
+  const bgClass = settings.isDarkMode ? 'bg-[#0a0e13] text-gray-100' : 'bg-gray-50 text-gray-900';
+  const glassButtonClass = getGlassClasses(settings.themeColor, settings.isDarkMode);
 
   return (
     <div className={`h-screen ${bgClass} font-sans flex flex-col overflow-hidden relative transition-colors duration-300`}>
@@ -209,12 +226,12 @@ export default function App() {
               penalty={penalty}
               scramble={scramble}
               onNewScramble={handleNewScramble}
-              themeColor={themeColor}
+              themeColor={settings.themeColor}
               setView={setView}
-              useInspection={useInspection}
-              inspectionHotkey={inspectionHotkey}
-              timerHotkey={timerHotkey}
-              isDarkMode={isDarkMode}
+              useInspection={settings.useInspection}
+              inspectionHotkey={settings.inspectionHotkey}
+              timerHotkey={settings.timerHotkey}
+              isDarkMode={settings.isDarkMode}
           />
           
           <button 
@@ -227,8 +244,7 @@ export default function App() {
           </button>
       </div>
       
-      {/* Visualizer Container - Conditionally Rendered */}
-      {showVisualizer && (
+      {settings.showVisualizer && (
         <div 
             className="flex justify-center pb-12" 
             style={{ 
