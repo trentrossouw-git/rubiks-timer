@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react'; // 1. Import Hooks
-import { RefreshCw } from 'lucide-react';
+import React from 'react';
+import { RefreshCw, Settings as SettingsIcon } from 'lucide-react';
 import { formatTime } from '../utils/helpers';
 
 const THEME_STYLES = {
@@ -9,55 +9,135 @@ const THEME_STYLES = {
     amber: { text: 'text-amber-400', glass: 'bg-amber-500/10 border-amber-500/20' },
 };
 
-export default function CubeTimer({ time, isInspecting, timerStatus, scramble, onNewScramble, themeColor }) {
+export default function CubeTimer({ 
+    time, 
+    inspectionTime,
+    timerStatus, 
+    penalty,
+    scramble, 
+    onNewScramble, 
+    themeColor,
+    setView,
+    useInspection,
+    inspectionHotkey
+}) {
     const activeStyle = THEME_STYLES[themeColor] || THEME_STYLES.indigo;
-    const isRunning = timerStatus === 'running';
+    
+    // Focus Mode Logic
+    const isFocusMode = timerStatus === 'running' || timerStatus === 'inspecting';
+    
+    // Blur style for Header and Scramble
+    const focusBlurStyle = {
+        opacity: isFocusMode ? 0.1 : 1,
+        filter: isFocusMode ? 'blur(4px)' : 'none',
+        transition: 'all 0.5s ease-in-out',
+        pointerEvents: isFocusMode ? 'none' : 'auto'
+    };
 
-    // 2. Local state to hold the previous time
-    const [lastValidTime, setLastValidTime] = useState(0);
+    const isInspecting = timerStatus === 'inspecting' || (timerStatus === 'holding' && inspectionTime < 15000 && inspectionTime > -2000);
 
-    // 3. Effect to capture the time whenever it is active (greater than 0)
-    useEffect(() => {
-        if (time > 0) {
-            setLastValidTime(time);
+    // --- Scramble Formatting Logic ---
+    const formatScramble = (scrambleStr) => {
+        if (!scrambleStr || scrambleStr === 'Generating...') return scrambleStr;
+        
+        const moves = scrambleStr.split(' ');
+        // If for some reason scramble is short, just show it
+        if (moves.length <= 10) return scrambleStr;
+
+        const row1 = moves.slice(0, 10).join(' ');
+        const row2 = moves.slice(10).join(' ');
+
+        return (
+            <div className="flex flex-col items-center gap-1">
+                <span>{row1}</span>
+                <span>{row2}</span>
+            </div>
+        );
+    };
+
+    // --- Inspection Display Logic ---
+    let inspectionDisplay = null;
+    let inspectionColor = activeStyle.text;
+
+    if (isInspecting) {
+        if (inspectionTime > 0) {
+            inspectionDisplay = Math.ceil(inspectionTime / 1000);
+            if (inspectionDisplay <= 8) inspectionColor = 'text-orange-400';
+            if (inspectionDisplay <= 3) inspectionColor = 'text-red-500';
+        } else {
+            const overtime = Math.abs(inspectionTime) / 1000;
+            inspectionDisplay = `+ ${overtime.toFixed(2)}`;
+            inspectionColor = 'text-red-600';
         }
-    }, [time]);
+    }
 
-    let timerColor = 'text-gray-100';
-    if (isInspecting) timerColor = activeStyle.text;
-    else if (timerStatus === 'ready') timerColor = 'text-[#22c55e]';
-    else if (timerStatus === 'holding') timerColor = 'text-[#E65F5F]';
+    // --- Main Timer Logic ---
+    let mainDisplay = formatTime(time);
+    let mainTimerColor = 'text-gray-100';
 
-    // 4. Determine what to display
-    // If inspecting, show inspection time.
-    // If running or the current time is > 0 (solve just finished), show current time.
-    // Otherwise (idle/holding/ready with time 0), show the remembered lastValidTime.
-    const timeToDisplay = (isInspecting || isRunning || time > 0) ? time : lastValidTime;
+    if (penalty === 'DNS') {
+        mainDisplay = 'DNS';
+        mainTimerColor = 'text-red-500';
+    } else if (timerStatus === 'ready') {
+        mainTimerColor = 'text-[#22c55e]';
+    } else if (timerStatus === 'holding') {
+        mainTimerColor = 'text-[#E65F5F]';
+    }
+
+    // --- Footer Text Logic ---
+    let footerText = 'Hold Space to Start';
+    if (timerStatus === 'holding') footerText = 'Hold...';
+    else if (timerStatus === 'ready') footerText = 'Release to Solve';
+    else if (isInspecting) footerText = 'Hold Space to Start';
+    else if ((timerStatus === 'idle' || timerStatus === 'finished') && useInspection) {
+        const keyName = inspectionHotkey.replace('Key', '');
+        footerText = `Press ${keyName} to begin inspection`;
+    }
 
     return (
-        <div className="flex flex-col items-center w-full max-w-4xl mx-auto">
-            <div className="flex justify-center pt-8 mb-2" style={{ opacity: isRunning ? 0 : 1, transition: '0.2s' }}>
+        <div className="flex flex-col items-center w-full max-w-4xl mx-auto relative">
+            
+            {/* Header */}
+            <div className="flex justify-center pt-6 mb-2" style={focusBlurStyle}>
                 <div className={`flex items-center ${activeStyle.glass} backdrop-blur-md border rounded-xl p-1 shadow-2xl`}>
-                    <div className="px-3 py-1.5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] border-r border-white/10 mr-1">3x3 WCA</div>
-                    <button onClick={onNewScramble} className="p-2 text-gray-400 hover:text-white rounded-lg cursor-pointer"><RefreshCw size={16} /></button>
+                    <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] border-r border-white/10 mr-1 ${activeStyle.text}`}>
+                        3x3 WCA
+                    </div>
+                    <button onClick={onNewScramble} className={`p-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${activeStyle.text}`}>
+                        <RefreshCw size={16} />
+                    </button>
+                    <button onClick={() => setView('settings')} className={`p-2 rounded-lg cursor-pointer transition-colors hover:bg-white/5 ${activeStyle.text}`}>
+                        <SettingsIcon size={16} />
+                    </button>
                 </div>
             </div>
 
-            <div className="flex justify-center w-full px-4 mt-12 mb-2 select-none min-h-[60px]" style={{ opacity: isRunning ? 0 : 1, transition: '0.2s' }}>
+            {/* Scramble - Updated to use formatting function */}
+            <div className="flex justify-center w-full px-4 mt-6 mb-2 select-none min-h-[60px]" style={focusBlurStyle}>
                 <h2 className="font-mono text-lg md:text-2xl text-gray-300 text-center tracking-wide leading-relaxed">
-                    {scramble}
+                    {formatScramble(scramble)}
                 </h2>
             </div>
 
-            <div className="flex justify-center mt-8 mb-12 w-full">
-                <div className={`font-mono text-7xl md:text-9xl font-bold tabular-nums tracking-tighter select-none transition-colors duration-200 ${timerColor} text-center`}>
-                    {/* Updated display logic here */}
-                    {isInspecting ? time : formatTime(timeToDisplay)}
+            {/* Timer Area */}
+            <div className="relative flex justify-center mt-10 mb-12 w-full">
+                
+                {/* INSPECTION OVERLAY */}
+                <div className={`absolute -top-10 left-0 right-0 flex justify-center transition-opacity duration-100 ${isInspecting ? 'opacity-100' : 'opacity-0'}`}>
+                    <span className={`font-mono text-4xl font-bold ${inspectionColor} ${inspectionTime > 0 ? 'animate-pulse' : ''}`}>
+                        {inspectionDisplay}
+                    </span>
+                </div>
+
+                {/* Main Numbers */}
+                <div className={`font-mono text-7xl md:text-9xl font-bold tabular-nums tracking-tighter select-none transition-colors duration-200 ${mainTimerColor} text-center`}>
+                    {mainDisplay}
                 </div>
             </div>
 
-            <div className={`pb-2 text-center ${activeStyle.text} text-[10px] font-bold uppercase tracking-[0.3em] transition-opacity duration-200 ${isRunning ? 'opacity-0' : 'opacity-100'}`}>
-                {isInspecting ? 'Inspect Now' : (timerStatus === 'holding' ? 'Hold...' : timerStatus === 'ready' ? 'Release to Solve' : 'Hold Space to Start')}
+            {/* Footer Text */}
+            <div className={`pb-2 text-center ${activeStyle.text} text-[10px] font-bold uppercase tracking-[0.3em] transition-opacity duration-200 ${timerStatus === 'running' ? 'opacity-0' : 'opacity-100'}`}>
+                {footerText}
             </div>
         </div>
     );
