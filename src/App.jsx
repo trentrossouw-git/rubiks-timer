@@ -5,10 +5,11 @@ import CubeTimer from './components/CubeTimer';
 import CubeVisualizer from './components/CubeVisualizer';
 import Settings from './pages/Settings';
 import Stats from './pages/Stats';
-import Cublet from './pages/Cublet';
+import Cublet from './pages/Cublet'; // <--- MAKE SURE THIS IMPORT EXISTS
 import { STD_SOLVED } from './utils/constants';
 import { generateRandomMoves, applyMove, cloneCube } from './utils/cubeLogic';
 import { calculateStats } from './utils/statsLogic';
+import { motion, AnimatePresence } from 'framer-motion';
 
 const DEFAULT_SETTINGS = {
     themeColor: 'indigo',
@@ -19,15 +20,20 @@ const DEFAULT_SETTINGS = {
     timerHotkey: 'Space',
     holdDuration: 550,
     dailyGoal: 50,
-    // NEW: Profile Settings
     profileName: 'Speedcuber',
-    profileImage: '', // Empty string = use default gradient
+    profileImage: '',
     navHotkeys: {
         timer: 'Digit1',
         stats: 'Digit2',
         cublet: 'Digit3',
         settings: 'Digit4'
     }
+};
+
+const pageVariants = {
+    initial: { opacity: 0, filter: 'blur(10px)' },
+    animate: { opacity: 1, filter: 'blur(0px)' },
+    exit: { opacity: 0, filter: 'blur(10px)' }
 };
 
 export default function App() {
@@ -208,16 +214,24 @@ export default function App() {
           isCollapsed={isSidebarCollapsed}
           toggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
           navHotkeys={settings.navHotkeys || { timer: 'Digit1', stats: 'Digit2', cublet: 'Digit3', settings: 'Digit4' }}
-          // NEW PROPS
           profileName={settings.profileName}
           profileImage={settings.profileImage}
       />
 
       {/* 2. MAIN CONTENT AREA */}
       <div className="flex-1 relative flex flex-col h-full overflow-hidden">
+        <AnimatePresence mode="wait">
           
           {view === 'timer' && (
-              <>
+              <motion.div 
+                key="timer" 
+                variants={pageVariants} 
+                initial="initial" 
+                animate="animate" 
+                exit="exit"
+                transition={{ duration: 0.3 }}
+                className="w-full h-full flex flex-col"
+              >
                 <div className="flex-1 flex flex-col justify-center min-h-[400px] z-20">
                     <CubeTimer 
                         time={time} 
@@ -250,14 +264,53 @@ export default function App() {
                         <CubeVisualizer state={cubeState} />
                     </div>
                 )}
-              </>
+              </motion.div>
           )}
 
-          {view === 'stats' && <Stats isDarkMode={settings.isDarkMode} />}
-          {view === 'cublet' && <Cublet isDarkMode={settings.isDarkMode} themeColor={settings.themeColor} />}
+          {view === 'stats' && (
+            <motion.div 
+                key="stats"
+                variants={pageVariants} 
+                initial="initial" 
+                animate="animate" 
+                exit="exit"
+                transition={{ duration: 0.3 }}
+                className="w-full h-full"
+            >
+                <Stats isDarkMode={settings.isDarkMode} />
+            </motion.div>
+          )}
+
+          {view === 'cublet' && (
+             <motion.div 
+                key="cublet"
+                variants={pageVariants} 
+                initial="initial" 
+                animate="animate" 
+                exit="exit"
+                transition={{ duration: 0.3 }}
+                className="w-full h-full"
+            >
+                {/* THIS IS THE CRITICAL FIX: Passing wallet props */}
+                <Cublet 
+                    isDarkMode={settings.isDarkMode} 
+                    themeColor={settings.themeColor} 
+                    wallet={wallet}
+                    setWallet={setWallet}
+                />
+            </motion.div>
+          )}
 
           {view === 'settings' && (
-             <div className="w-full h-full flex justify-center items-center p-8">
+             <motion.div 
+                key="settings"
+                variants={pageVariants} 
+                initial="initial" 
+                animate="animate" 
+                exit="exit"
+                transition={{ duration: 0.3 }}
+                className="w-full h-full flex justify-center items-center p-8"
+             >
                 <Settings 
                     onBack={() => setView('timer')}
                     themeColor={settings.themeColor} setThemeColor={(v) => updateSetting('themeColor', v)}
@@ -268,12 +321,12 @@ export default function App() {
                     timerHotkey={settings.timerHotkey} setTimerHotkey={(v) => updateSetting('timerHotkey', v)}
                     holdDuration={settings.holdDuration} setHoldDuration={(v) => updateSetting('holdDuration', v)}
                     navHotkeys={settings.navHotkeys || {}} setNavHotkeys={(v) => updateSetting('navHotkeys', v)}
-                    // NEW PROPS
                     profileName={settings.profileName} setProfileName={(v) => updateSetting('profileName', v)}
                     profileImage={settings.profileImage} setProfileImage={(v) => updateSetting('profileImage', v)}
                 />
-             </div>
+             </motion.div>
           )}
+        </AnimatePresence>
 
       </div>
     </div>
