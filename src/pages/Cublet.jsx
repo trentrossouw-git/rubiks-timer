@@ -1,6 +1,6 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from 'framer-motion';
-import { Trophy, Cookie, Move3d } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
+import { Trophy, Cookie, Move3d, Sparkles, Zap } from 'lucide-react';
 import useLocalStorage from '../hooks/useLocalStorage';
 
 // --- CONFIGURATION ---
@@ -9,7 +9,6 @@ const XP_PER_FEED = 25;
 const XP_BASE_REQ = 100;
 const CUBIE_SIZE = 40; // px
 
-// Standard Rubik's Color Palette
 const CUBE_COLORS = {
     top: '#ffffff',    // White
     bottom: '#fbbf24', // Yellow
@@ -20,10 +19,13 @@ const CUBE_COLORS = {
 };
 
 const getCubletStage = (level) => {
+    // Level 0: The Egg (1x1 Grey)
     if (level === 0) return { size: 1, stageName: "Cublet Egg" };
-    if (level === 1) return { size: 1, stageName: "Baby Cublet" };
+    // Level 1-8: The 2x2
     if (level <= 8) return { size: 2, stageName: "Rookie Cube" };
+    // Level 9-27: The 3x3
     if (level <= 27) return { size: 3, stageName: "Speed Cube" };
+    // Level 28+: The 4x4
     return { size: 4, stageName: "Master Cube" };
 };
 
@@ -35,9 +37,14 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         xp: 0,
         totalFed: 0
     });
+    
+    // Animation States
     const [isFeeding, setIsFeeding] = useState(false);
+    const [levelUpType, setLevelUpType] = useState(null); // 'piece' or 'evolve'
 
     const stageInfo = getCubletStage(cubletData.level);
+    
+    // XP Calculation
     const xpRequired = XP_BASE_REQ * Math.ceil((cubletData.level + 1) * 1.2);
     const progressPercent = Math.min(100, (cubletData.xp / xpRequired) * 100);
     const piecesColored = cubletData.level;
@@ -54,13 +61,30 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
             let newXp = prev.xp + XP_PER_FEED;
             let newLevel = prev.level;
             
+            // Check for Level Up
             if (newXp >= xpRequired) {
                 newXp = newXp - xpRequired;
                 newLevel += 1;
+                
+                // Determine if this is a standard Level Up or an Evolution
+                const oldStage = getCubletStage(prev.level);
+                const newStage = getCubletStage(newLevel);
+                
+                if (newStage.size > oldStage.size) {
+                    triggerLevelUpEffect('evolve');
+                } else {
+                    triggerLevelUpEffect('piece');
+                }
             }
 
             return { ...prev, xp: newXp, level: newLevel, totalFed: prev.totalFed + 1 };
         });
+    };
+
+    const triggerLevelUpEffect = (type) => {
+        setLevelUpType(type);
+        // Clear the effect after animation finishes (2.5s)
+        setTimeout(() => setLevelUpType(null), 2500);
     };
 
     // --- INTERACTIVE 3D AVATAR ---
@@ -68,12 +92,8 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         const { size } = stageInfo;
         const containerSize = size * CUBIE_SIZE;
 
-        // --- ROTATION STATE ---
-        // We use motion values instead of React state for 60fps performance without re-renders
         const rotateX = useMotionValue(-20);
         const rotateY = useMotionValue(30);
-        
-        // Add springs for momentum/physics
         const rotateXSpring = useSpring(rotateX, { stiffness: 120, damping: 20 });
         const rotateYSpring = useSpring(rotateY, { stiffness: 120, damping: 20 });
 
@@ -88,22 +108,15 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         const handlePointerMove = (e) => {
             if (!isDragging) return;
             e.preventDefault();
-            
             const deltaX = e.clientX - lastPos.current.x;
             const deltaY = e.clientY - lastPos.current.y;
-
-            // Invert deltaY for natural feel (drag up = rotate up)
             rotateY.set(rotateY.get() + deltaX * 0.5); 
             rotateX.set(rotateX.get() - deltaY * 0.5);
-
             lastPos.current = { x: e.clientX, y: e.clientY };
         };
 
-        const handlePointerUp = () => {
-            setIsDragging(false);
-        };
+        const handlePointerUp = () => setIsDragging(false);
 
-        // Re-generate grid based on level
         const cubies = [];
         let count = 0;
         for (let z = 0; z < size; z++) {
@@ -136,10 +149,15 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
                 onPointerLeave={handlePointerUp}
             >
                 <motion.div 
-                    // Float animation on Y axis only (position), rotation is handled by drag
-                    animate={{ y: [0, -10, 0] }}
-                    transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
-                    
+                    // Add shake/spin effect when leveling up
+                    animate={levelUpType === 'evolve' 
+                        ? { scale: [1, 1.2, 1], rotateY: [0, 360, 0] } 
+                        : { y: [0, -10, 0] }
+                    }
+                    transition={levelUpType === 'evolve' 
+                        ? { duration: 1, ease: "easeInOut" } 
+                        : { duration: 4, repeat: Infinity, ease: "easeInOut" }
+                    }
                     className={`relative transition-transform duration-200 ${isFeeding ? 'scale-110' : 'scale-100'}`}
                     style={{ 
                         width: containerSize, 
@@ -151,7 +169,6 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
                 >
                     {cubies}
                     
-                    {/* Eyes - Attached to the front face cluster */}
                     <div 
                         className="absolute flex gap-3 z-50 pointer-events-none"
                         style={{
@@ -186,8 +203,50 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
             <div className="flex-1 overflow-hidden relative">
                 <AnimatePresence mode="wait">
                     {view === 'main' && (
-                        <motion.div key="main" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="w-full h-full flex flex-col items-center justify-center pb-20">
+                        <motion.div key="main" initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} className="w-full h-full flex flex-col items-center justify-center pb-20 relative">
                             
+                            {/* --- POPUPS / OVERLAYS --- */}
+                            <AnimatePresence>
+                                {/* 1. Piece Unlock Popup */}
+                                {levelUpType === 'piece' && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, y: 50, scale: 0.5 }}
+                                        animate={{ opacity: 1, y: -100, scale: 1 }}
+                                        exit={{ opacity: 0, y: -150 }}
+                                        transition={{ duration: 1.5, type: "spring" }}
+                                        className="absolute z-50 pointer-events-none flex flex-col items-center gap-2"
+                                        style={{ top: '40%' }}
+                                    >
+                                        <div className="bg-yellow-400 text-yellow-900 font-black px-4 py-2 rounded-xl shadow-xl text-lg flex items-center gap-2 border-2 border-yellow-200">
+                                            <Sparkles size={20} />
+                                            <span>PIECE UNLOCKED!</span>
+                                        </div>
+                                    </motion.div>
+                                )}
+
+                                {/* 2. Evolution Popup */}
+                                {levelUpType === 'evolve' && (
+                                    <motion.div 
+                                        initial={{ opacity: 0, scale: 0 }}
+                                        animate={{ opacity: 1, scale: 1 }}
+                                        exit={{ opacity: 0, scale: 2 }}
+                                        transition={{ duration: 0.5 }}
+                                        className="absolute inset-0 z-50 flex flex-col items-center justify-center bg-black/50 backdrop-blur-sm"
+                                    >
+                                        <motion.div 
+                                            animate={{ rotate: [0, 10, -10, 0] }}
+                                            transition={{ duration: 0.5, delay: 0.2 }}
+                                            className="bg-gradient-to-br from-indigo-500 to-purple-600 text-white p-8 rounded-3xl shadow-2xl border-4 border-white/20 text-center"
+                                        >
+                                            <Zap size={48} className="mx-auto mb-4 text-yellow-300" />
+                                            <h2 className="text-4xl font-black mb-2 italic">EVOLUTION!</h2>
+                                            <p className="text-lg font-medium opacity-90">Your Cublet has grown.</p>
+                                        </motion.div>
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+
+                            {/* Standard Info */}
                             <div className="text-center mb-4 select-none">
                                 <h2 className="text-3xl font-bold mb-2">{cubletData.name}</h2>
                                 <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-widest ${isDarkMode ? 'bg-gray-800 text-gray-400' : 'bg-gray-200 text-gray-600'}`}>
@@ -197,10 +256,9 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
                                 </div>
                             </div>
 
-                            {/* Avatar Container */}
                             <div className="mb-12 relative w-full flex justify-center h-[320px] items-center">
                                 <CubletAvatar />
-                                {isFeeding && (
+                                {isFeeding && !levelUpType && (
                                     <motion.div initial={{ opacity: 1, y: 0, scale: 0.8 }} animate={{ opacity: 0, y: -60, scale: 1.2 }} className={`absolute top-10 font-black text-2xl text-blue-500 z-50 drop-shadow-lg pointer-events-none`}>
                                         +{XP_PER_FEED} XP
                                     </motion.div>
@@ -252,41 +310,45 @@ const Eye = ({ isFeeding }) => (
     </motion.div>
 );
 
-// --- 3D Cubie Component ---
 const Cubie = ({ x, y, z, size, isUnlocked, isDarkMode }) => {
-    // Center offset calculations
     const offset = (size * CUBIE_SIZE) / 2 - (CUBIE_SIZE / 2);
     const xPos = x * CUBIE_SIZE - offset;
     const yPos = y * CUBIE_SIZE - offset;
     const zPos = z * CUBIE_SIZE - offset;
-
-    // Visual Config
+    
     const greyFill = isDarkMode ? '#4b5563' : '#d1d5db'; 
-    const greyBorder = isDarkMode ? '#1f2937' : '#9ca3af';
+    const internalBlack = '#1a1a1a'; 
 
     const getFaceColor = (faceType) => {
-        if (!isUnlocked) return greyFill;
-
+        if (!isUnlocked) return greyFill; 
         switch (faceType) {
-            case 'top': return y === size - 1 ? CUBE_COLORS.top : '#000';
-            case 'bottom': return y === 0 ? CUBE_COLORS.bottom : '#000';
-            case 'front': return z === size - 1 ? CUBE_COLORS.front : '#000';
-            case 'back': return z === 0 ? CUBE_COLORS.back : '#000';
-            case 'right': return x === size - 1 ? CUBE_COLORS.right : '#000';
-            case 'left': return x === 0 ? CUBE_COLORS.left : '#000';
-            default: return '#000';
+            case 'top': return y === size - 1 ? CUBE_COLORS.top : internalBlack;
+            case 'bottom': return y === 0 ? CUBE_COLORS.bottom : internalBlack;
+            case 'front': return z === size - 1 ? CUBE_COLORS.front : internalBlack;
+            case 'back': return z === 0 ? CUBE_COLORS.back : internalBlack;
+            case 'right': return x === size - 1 ? CUBE_COLORS.right : internalBlack;
+            case 'left': return x === 0 ? CUBE_COLORS.left : internalBlack;
+            default: return internalBlack;
         }
     };
 
-    const faceStyle = (faceType, transform) => ({
-        position: 'absolute',
-        width: `${CUBIE_SIZE}px`,
-        height: `${CUBIE_SIZE}px`,
-        boxSizing: 'border-box',
-        border: `1px solid ${isUnlocked ? '#000' : greyBorder}`, 
-        backgroundColor: getFaceColor(faceType),
-        transform: transform,
-    });
+    const faceStyle = (faceType, transform) => {
+        const color = getFaceColor(faceType);
+        const isInternal = color === internalBlack;
+
+        return {
+            position: 'absolute',
+            width: `${CUBIE_SIZE}px`,
+            height: `${CUBIE_SIZE}px`,
+            boxSizing: 'border-box',
+            borderRadius: '6px', 
+            border: `2px solid ${isInternal ? '#000' : (isDarkMode ? '#000' : 'rgba(0,0,0,0.1)')}`, 
+            backgroundColor: color,
+            boxShadow: isInternal ? 'none' : 'inset 0 0 8px rgba(0,0,0,0.15)',
+            transform: transform,
+            backfaceVisibility: 'hidden', 
+        };
+    };
     
     const halfSize = CUBIE_SIZE / 2;
 
@@ -297,7 +359,7 @@ const Cubie = ({ x, y, z, size, isUnlocked, isDarkMode }) => {
                 width: `${CUBIE_SIZE}px`,
                 height: `${CUBIE_SIZE}px`,
                 transformStyle: 'preserve-3d',
-                transform: `translateX(${xPos}px) translateY(${-yPos}px) translateZ(${zPos}px)`,
+                transform: `translateX(${xPos}px) translateY(${-yPos}px) translateZ(${zPos}px) scale(0.96)`,
             }}
         >
             <div style={faceStyle('front',  `translateZ(${halfSize}px)`)} />

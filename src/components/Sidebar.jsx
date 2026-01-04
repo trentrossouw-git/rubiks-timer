@@ -20,7 +20,9 @@ export default function Sidebar({
 
     const getIconStyle = (viewName) => {
         const isActive = activeView === viewName;
-        const baseClass = "flex items-center gap-4 p-3 rounded-xl transition-all duration-300 relative group cursor-pointer overflow-hidden outline-none focus-visible:ring-2 focus-visible:ring-gray-400";
+        // CHANGED: Removed 'focus-visible:ring-2 focus-visible:ring-gray-400'
+        // Added 'focus:outline-none' just to be safe
+        const baseClass = "flex items-center gap-4 p-3 rounded-xl transition-all duration-300 relative group cursor-pointer overflow-hidden outline-none focus:outline-none";
         
         if (isActive) {
             return `${baseClass} bg-${themeColor}-500/20 text-${themeColor}-500 shadow-[0_0_15px_rgba(var(--color-${themeColor}-500),0.2)]`;
@@ -57,7 +59,7 @@ export default function Sidebar({
                     )}
                 </div>
                 
-                {/* Profile Name (No 'Basic Plan') */}
+                {/* Profile Name */}
                 <div className={`flex flex-col overflow-hidden transition-all duration-300 ${isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'}`}>
                     <span className={`font-bold text-sm truncate max-w-[140px] ${isDarkMode ? 'text-gray-200' : 'text-gray-900'}`}>
                         {profileName || 'Guest'}
