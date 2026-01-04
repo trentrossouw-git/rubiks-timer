@@ -1,5 +1,5 @@
 import React from 'react';
-import { RefreshCw, Settings as SettingsIcon } from 'lucide-react';
+import { RefreshCw, Settings as SettingsIcon, Box } from 'lucide-react'; // Import Box icon for "Cubes"
 import { formatTime } from '../utils/helpers';
 
 const THEME_STYLES = {
@@ -20,8 +20,11 @@ export default function CubeTimer({
     setView,
     useInspection,
     inspectionHotkey,
-    timerHotkey,  // New Prop
-    isDarkMode    // New Prop
+    timerHotkey,
+    isDarkMode,
+    cubes,        // New Prop
+    dailyProgress, // New Prop
+    dailyGoal     // New Prop
 }) {
     const activeStyle = THEME_STYLES[themeColor] || THEME_STYLES.indigo;
     
@@ -101,8 +104,10 @@ export default function CubeTimer({
         <div className="flex flex-col items-center w-full max-w-4xl mx-auto relative">
             
             {/* Header */}
-            <div className="flex justify-center pt-6 mb-2" style={focusBlurStyle}>
-                <div className={`flex items-center ${glassClass} backdrop-blur-md border rounded-xl p-1 shadow-2xl`}>
+            <div className="flex justify-center pt-6 mb-2 w-full relative">
+                
+                {/* Center Group */}
+                <div className={`flex items-center ${glassClass} backdrop-blur-md border rounded-xl p-1 shadow-2xl transition-all duration-500`} style={focusBlurStyle}>
                     <div className={`px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] border-r ${isDarkMode ? 'border-white/10' : 'border-black/10'} mr-1 ${activeStyle.text}`}>
                         3x3 WCA
                     </div>
@@ -113,6 +118,23 @@ export default function CubeTimer({
                         <SettingsIcon size={16} />
                     </button>
                 </div>
+
+                {/* NEW: Wallet / Daily Goal Display (Top Right) */}
+                <div 
+                    className={`absolute right-4 top-6 flex items-center gap-3 px-3 py-1.5 rounded-lg border backdrop-blur-md transition-all duration-500 ${glassClass} ${isFocusMode ? 'opacity-0 translate-y-[-10px]' : 'opacity-100'}`}
+                >
+                    <div className="flex items-center gap-1.5 border-r pr-3 border-gray-500/20">
+                        <Box size={14} className={activeStyle.text} />
+                        <span className={`text-xs font-bold font-mono ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>{cubes}</span>
+                    </div>
+                    <div className="flex flex-col items-end">
+                        <span className="text-[8px] font-bold uppercase tracking-wider opacity-60">Daily</span>
+                        <span className={`text-[10px] font-mono leading-none ${dailyProgress >= dailyGoal ? 'text-green-500' : (isDarkMode ? 'text-gray-300' : 'text-gray-700')}`}>
+                            {dailyProgress}/{dailyGoal}
+                        </span>
+                    </div>
+                </div>
+
             </div>
 
             {/* Scramble */}
@@ -124,7 +146,6 @@ export default function CubeTimer({
 
             {/* Timer Area */}
             <div className="relative flex justify-center mt-10 mb-12 w-full">
-                
                 {/* INSPECTION OVERLAY */}
                 <div className={`absolute -top-10 left-0 right-0 flex justify-center transition-opacity duration-100 ${isInspecting ? 'opacity-100' : 'opacity-0'}`}>
                     <span className={`font-mono text-4xl font-bold ${inspectionColor} ${inspectionTime > 0 ? 'animate-pulse' : ''}`}>

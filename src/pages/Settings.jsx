@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { X, Keyboard, Hand, Palette, Timer, Monitor, Sun, Moon, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Keyboard, Hand, Palette, Timer, LayoutGrid, Sun, Moon, Eye, EyeOff, User, Upload } from 'lucide-react';
 
 const COLOR_VARIANTS = {
     indigo: { active: 'bg-indigo-500 border-indigo-400', inactive: 'bg-indigo-500/20 border-indigo-500/40' },
@@ -16,21 +16,26 @@ export default function Settings({
     useInspection, setUseInspection,
     inspectionHotkey, setInspectionHotkey,
     timerHotkey, setTimerHotkey,
-    holdDuration, setHoldDuration
+    holdDuration, setHoldDuration,
+    navHotkeys, setNavHotkeys,
+    profileName, setProfileName,
+    profileImage, setProfileImage
 }) {
-    const [activeTab, setActiveTab] = useState('appearance');
-    const [listeningFor, setListeningFor] = useState(null); // 'inspection' or 'timer' or null
+    const [activeTab, setActiveTab] = useState('profile');
+    const [listeningFor, setListeningFor] = useState(null); 
+    const fileInputRef = useRef(null); // Ref for the hidden file input
 
-    // Key Listener for Hotkeys
     useEffect(() => {
         const handleKeyDown = (e) => {
             if (listeningFor) {
                 e.preventDefault();
                 const code = e.code;
-                
                 if (listeningFor === 'inspection') setInspectionHotkey(code);
-                if (listeningFor === 'timer') setTimerHotkey(code);
-                
+                else if (listeningFor === 'timer') setTimerHotkey(code);
+                else if (listeningFor.startsWith('nav-')) {
+                    const key = listeningFor.replace('nav-', '');
+                    setNavHotkeys({ ...navHotkeys, [key]: code });
+                }
                 setListeningFor(null);
                 return;
             }
@@ -39,196 +44,198 @@ export default function Settings({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [listeningFor, setInspectionHotkey, setTimerHotkey, onBack]);
+    }, [listeningFor, setInspectionHotkey, setTimerHotkey, setNavHotkeys, navHotkeys, onBack]);
 
-    // Helpers
     const activeText = `text-${themeColor}-500`;
-    const getSwitchStyle = (isActive) => {
-        if (!isActive) return isDarkMode ? 'bg-gray-700' : 'bg-gray-300';
-        return `bg-${themeColor}-500 shadow-[0_0_10px_rgba(var(--color-${themeColor}-500),0.4)]`;
+
+    // Handle Image Upload logic
+    const handleImageUpload = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setProfileImage(reader.result); // Save Base64 string to state
+            };
+            reader.readAsDataURL(file);
+        }
     };
 
-    return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className={`w-full max-w-2xl h-[500px] flex rounded-2xl shadow-2xl overflow-hidden border ${isDarkMode ? 'bg-[#0f1115] border-gray-800' : 'bg-white border-gray-200'}`}>
-                
-                {/* --- SIDEBAR --- */}
-                <div className={`w-1/3 border-r p-4 flex flex-col gap-2 ${isDarkMode ? 'bg-[#13161c] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
-                    <h2 className={`text-xs font-bold uppercase tracking-widest mb-4 pl-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Settings</h2>
-                    
-                    <button 
-                        onClick={() => setActiveTab('appearance')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'appearance' 
-                            ? (isDarkMode ? `bg-white/5 text-${themeColor}-400` : `bg-black/5 text-${themeColor}-600`) 
-                            : (isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-black hover:bg-black/5')}`}
-                    >
-                        <Palette size={18} /> Appearance
-                    </button>
+    // Components
+    const NavTab = ({ id, icon: Icon, label }) => (
+        <button onClick={() => setActiveTab(id)} className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === id ? (isDarkMode ? `bg-white/5 text-${themeColor}-400` : `bg-black/5 text-${themeColor}-600`) : 'text-gray-500 hover:text-gray-900'}`}>
+            <Icon size={18} /> {label}
+        </button>
+    );
 
-                    <button 
-                        onClick={() => setActiveTab('timer')}
-                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'timer' 
-                            ? (isDarkMode ? `bg-white/5 text-${themeColor}-400` : `bg-black/5 text-${themeColor}-600`) 
-                            : (isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-black hover:bg-black/5')}`}
-                    >
-                        <Timer size={18} /> Timer
-                    </button>
-                    
-                    <div className="mt-auto">
-                         <button onClick={onBack} className={`w-full py-3 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${isDarkMode ? 'border-gray-800 text-gray-500 hover:border-gray-700 hover:text-white' : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-black'}`}>
-                            Close (S)
-                         </button>
-                    </div>
-                </div>
-
-                {/* --- CONTENT AREA --- */}
-                <div className={`flex-1 p-8 overflow-y-auto ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
-                    
-                    {/* APPEARANCE TAB */}
-                    {activeTab === 'appearance' && (
-                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                            {/* Color Picker */}
-                            <section>
-                                <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Accent Color</h3>
-                                <div className="grid grid-cols-4 gap-3">
-                                    {Object.keys(COLOR_VARIANTS).map(color => (
-                                        <button
-                                            key={color}
-                                            onClick={() => setThemeColor(color)}
-                                            className={`h-12 rounded-xl border-2 transition-all duration-200 ${
-                                                themeColor === color 
-                                                ? COLOR_VARIANTS[color].active + ' scale-105 shadow-lg'
-                                                : COLOR_VARIANTS[color].inactive + ' hover:opacity-100 opacity-60'
-                                            }`}
-                                        />
-                                    ))}
-                                </div>
-                            </section>
-
-                            {/* Dark/Light Mode */}
-                            <section className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    {isDarkMode ? <Moon size={20} className={activeText} /> : <Sun size={20} className="text-orange-400" />}
-                                    <div>
-                                        <span className="block text-sm font-medium">Dark Mode</span>
-                                        <span className="text-[10px] text-gray-500 uppercase">Adjust interface brightness</span>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => setIsDarkMode(!isDarkMode)}
-                                    className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${isDarkMode ? `bg-${themeColor}-500` : 'bg-gray-300'}`}
-                                >
-                                    <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${isDarkMode ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
-                            </section>
-
-                            {/* Visualizer Toggle */}
-                            <section className="flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    {showVisualizer ? <Eye size={20} className={activeText} /> : <EyeOff size={20} className="text-gray-400" />}
-                                    <div>
-                                        <span className="block text-sm font-medium">3D Cube Visualizer</span>
-                                        <span className="text-[10px] text-gray-500 uppercase">Show rendered cube state</span>
-                                    </div>
-                                </div>
-                                <button 
-                                    onClick={() => setShowVisualizer(!showVisualizer)}
-                                    className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${showVisualizer ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}
-                                >
-                                    <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${showVisualizer ? 'translate-x-5' : 'translate-x-0'}`} />
-                                </button>
-                            </section>
-                        </div>
-                    )}
-
-                    {/* TIMER TAB */}
-                    {activeTab === 'timer' && (
-                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
-                            
-                            {/* Inspection Toggle */}
-                            <section>
-                                <div className="flex items-center justify-between mb-4">
-                                    <div className="flex items-center gap-3">
-                                        <Hand size={20} className={useInspection ? activeText : 'text-gray-400'} />
-                                        <div>
-                                            <span className="block text-sm font-medium">WCA Inspection</span>
-                                            <span className="text-[10px] text-gray-500 uppercase">15s countdown before solve</span>
-                                        </div>
-                                    </div>
-                                    <button 
-                                        onClick={() => setUseInspection(!useInspection)}
-                                        className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${useInspection ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}
-                                    >
-                                        <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${useInspection ? 'translate-x-5' : 'translate-x-0'}`} />
-                                    </button>
-                                </div>
-                                
-                                {useInspection && (
-                                    <button 
-                                        onClick={() => setListeningFor('inspection')}
-                                        className={`w-full flex items-center justify-between border text-sm py-3 px-4 rounded-xl transition-all ${listeningFor === 'inspection' ? `border-${themeColor}-500 text-${themeColor}-500 bg-${themeColor}-500/10` : (isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50')}`}
-                                    >
-                                        <span className="font-medium">Inspection Hotkey</span>
-                                        <div className="flex items-center gap-2 font-mono text-xs opacity-70">
-                                            {listeningFor === 'inspection' ? 'Press key...' : inspectionHotkey.replace('Key', '')}
-                                            <Keyboard size={14} />
-                                        </div>
-                                    </button>
-                                )}
-                            </section>
-
-                            <hr className={isDarkMode ? 'border-gray-800' : 'border-gray-200'} />
-
-                            {/* Timer Hotkey */}
-                            <section>
-                                <button 
-                                    onClick={() => setListeningFor('timer')}
-                                    className={`w-full flex items-center justify-between border text-sm py-3 px-4 rounded-xl transition-all mb-4 ${listeningFor === 'timer' ? `border-${themeColor}-500 text-${themeColor}-500 bg-${themeColor}-500/10` : (isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50')}`}
-                                >
-                                    <div className="flex flex-col items-start">
-                                        <span className="font-medium">Start Timer Hotkey</span>
-                                        <span className="text-[10px] opacity-50 uppercase">Key to hold and release</span>
-                                    </div>
-                                    <div className="flex items-center gap-2 font-mono text-xs opacity-70">
-                                        {listeningFor === 'timer' ? 'Press key...' : timerHotkey.replace('Key', '')}
-                                        <Keyboard size={14} />
-                                    </div>
-                                </button>
-                            </section>
-
-                            {/* Hold Duration */}
-                            <section className="flex items-center justify-between">
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium">Hold Duration (ms)</span>
-                                    <span className="text-[10px] text-gray-500 uppercase">Time to hold before ready</span>
-                                </div>
-                                <div className={`relative w-24 rounded-xl border overflow-hidden ${isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
-                                    <input 
-                                        type="number"
-                                        value={holdDuration}
-                                        onChange={(e) => setHoldDuration(e.target.value)}
-                                        placeholder="550"
-                                        className={`w-full h-10 px-3 text-center bg-transparent outline-none font-mono text-sm no-spinner ${isDarkMode ? 'text-white placeholder-gray-700' : 'text-black placeholder-gray-300'}`}
-                                    />
-                                </div>
-                            </section>
-
-                        </div>
-                    )}
-                </div>
+    const HotkeyButton = ({ label, value, listenId }) => (
+        <button 
+            onClick={() => setListeningFor(listenId)}
+            className={`w-full flex items-center justify-between border text-sm py-3 px-4 rounded-xl transition-all mb-3 ${listeningFor === listenId ? `border-${themeColor}-500 text-${themeColor}-500 bg-${themeColor}-500/10` : (isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50')}`}
+        >
+            <span className="font-medium">{label}</span>
+            <div className="flex items-center gap-2 font-mono text-xs opacity-70">
+                {listeningFor === listenId ? 'Press key...' : (value ? value.replace('Digit', '').replace('Key', '') : 'Unset')}
+                <Keyboard size={14} />
             </div>
+        </button>
+    );
+
+    return (
+        <div className={`w-full max-w-4xl h-[600px] flex rounded-2xl shadow-2xl overflow-hidden border ${isDarkMode ? 'bg-[#0f1115] border-gray-800' : 'bg-white border-gray-200'}`}>
             
-            {/* CSS to hide spinner arrows on number input */}
-            <style jsx>{`
-                .no-spinner::-webkit-inner-spin-button, 
-                .no-spinner::-webkit-outer-spin-button { 
-                    -webkit-appearance: none; 
-                    margin: 0; 
-                }
-                .no-spinner { 
-                    -moz-appearance: textfield; 
-                }
-            `}</style>
+            {/* SIDEBAR */}
+            <div className={`w-64 border-r p-6 flex flex-col gap-2 ${isDarkMode ? 'bg-[#13161c] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                <h2 className={`text-xs font-bold uppercase tracking-widest mb-4 pl-2 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Configuration</h2>
+                <NavTab id="profile" icon={User} label="Profile" />
+                <NavTab id="appearance" icon={Palette} label="Appearance" />
+                <NavTab id="timer" icon={Timer} label="Timer & Input" />
+                <NavTab id="navigation" icon={LayoutGrid} label="Navigation" />
+            </div>
+
+            {/* CONTENT */}
+            <div className={`flex-1 p-10 overflow-y-auto ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
+                
+                {/* PROFILE SETTINGS */}
+                {activeTab === 'profile' && (
+                     <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                        <section>
+                            <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Public Profile</h3>
+                            
+                            <div className="flex gap-6 items-start">
+                                {/* Preview */}
+                                <div className={`w-24 h-24 shrink-0 rounded-full overflow-hidden border-4 shadow-lg ${isDarkMode ? 'border-gray-800' : 'border-white'}`}>
+                                    {profileImage ? (
+                                        <img src={profileImage} alt="Profile" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className={`w-full h-full bg-gradient-to-br from-${themeColor}-500 to-${themeColor}-700 flex items-center justify-center`}>
+                                            <User size={32} className="text-white/80" />
+                                        </div>
+                                    )}
+                                </div>
+
+                                <div className="flex-1 space-y-4">
+                                    {/* Name Input */}
+                                    <div>
+                                        <label className="block text-xs font-bold mb-1 ml-1 opacity-60">Display Name</label>
+                                        <input 
+                                            type="text" 
+                                            value={profileName}
+                                            onChange={(e) => setProfileName(e.target.value)}
+                                            className={`w-full px-4 py-2 rounded-xl border bg-transparent outline-none focus:ring-2 focus:ring-${themeColor}-500/50 ${isDarkMode ? 'border-gray-700 focus:border-transparent' : 'border-gray-300'}`}
+                                            placeholder="Guest"
+                                        />
+                                    </div>
+                                    
+                                    {/* Image Upload Buttons */}
+                                    <div>
+                                        <label className="block text-xs font-bold mb-1 ml-1 opacity-60">Avatar Image</label>
+                                        
+                                        <div className="flex gap-2">
+                                            {/* Hidden File Input */}
+                                            <input 
+                                                type="file" 
+                                                ref={fileInputRef}
+                                                onChange={handleImageUpload}
+                                                className="hidden" 
+                                                accept="image/*"
+                                            />
+                                            
+                                            {/* Trigger Button */}
+                                            <button 
+                                                onClick={() => fileInputRef.current.click()}
+                                                className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide border transition-all ${isDarkMode ? 'border-gray-700 hover:bg-white/5' : 'border-gray-300 hover:bg-black/5'}`}
+                                            >
+                                                <Upload size={14} /> Upload File
+                                            </button>
+                                            
+                                            {/* Remove Button */}
+                                            {profileImage && (
+                                                <button 
+                                                    onClick={() => setProfileImage('')}
+                                                    className="px-4 py-2 rounded-xl text-xs font-bold uppercase tracking-wide text-red-500 hover:bg-red-500/10 transition-colors"
+                                                >
+                                                    Remove
+                                                </button>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </section>
+                     </div>
+                )}
+
+                {/* (Rest of the tabs remain exactly the same as previous step...) */}
+                {/* APPEARANCE */}
+                {activeTab === 'appearance' && (
+                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                        <section>
+                            <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Theme Color</h3>
+                            <div className="grid grid-cols-4 gap-3">
+                                {Object.keys(COLOR_VARIANTS).map(color => (
+                                    <button key={color} onClick={() => setThemeColor(color)} className={`h-12 rounded-xl border-2 transition-all duration-200 ${themeColor === color ? COLOR_VARIANTS[color].active + ' scale-105 shadow-lg' : COLOR_VARIANTS[color].inactive + ' opacity-60 hover:opacity-100'}`} />
+                                ))}
+                            </div>
+                        </section>
+                        <section className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                {isDarkMode ? <Moon size={20} className={activeText} /> : <Sun size={20} className="text-orange-400" />}
+                                <div><span className="block text-sm font-medium">Dark Mode</span></div>
+                            </div>
+                            <button onClick={() => setIsDarkMode(!isDarkMode)} className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${isDarkMode ? `bg-${themeColor}-500` : 'bg-gray-300'}`}>
+                                <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${isDarkMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                        </section>
+                        <section className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                                {showVisualizer ? <Eye size={20} className={activeText} /> : <EyeOff size={20} className="text-gray-400" />}
+                                <div><span className="block text-sm font-medium">3D Cube Visualizer</span></div>
+                            </div>
+                            <button onClick={() => setShowVisualizer(!showVisualizer)} className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${showVisualizer ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}>
+                                <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${showVisualizer ? 'translate-x-5' : 'translate-x-0'}`} />
+                            </button>
+                        </section>
+                    </div>
+                )}
+
+                {/* TIMER */}
+                {activeTab === 'timer' && (
+                    <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                         <section>
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex items-center gap-3">
+                                    <Hand size={20} className={useInspection ? activeText : 'text-gray-400'} />
+                                    <div><span className="block text-sm font-medium">WCA Inspection</span></div>
+                                </div>
+                                <button onClick={() => setUseInspection(!useInspection)} className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${useInspection ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}><div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${useInspection ? 'translate-x-5' : 'translate-x-0'}`} /></button>
+                            </div>
+                            {useInspection && <HotkeyButton label="Inspection Start/Cancel" value={inspectionHotkey} listenId="inspection" />}
+                        </section>
+                        <hr className={isDarkMode ? 'border-gray-800' : 'border-gray-200'} />
+                        <section>
+                            <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Controls</h3>
+                            <HotkeyButton label="Start Timer Hotkey" value={timerHotkey} listenId="timer" />
+                            <div className="flex items-center justify-between mt-4">
+                                <span className="text-sm font-medium">Hold Duration (ms)</span>
+                                <div className={`w-24 rounded-xl border overflow-hidden ${isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                                    <input type="number" value={holdDuration} onChange={(e) => setHoldDuration(e.target.value)} className={`w-full h-10 px-3 text-center bg-transparent outline-none font-mono text-sm ${isDarkMode ? 'text-white' : 'text-black'}`} />
+                                </div>
+                            </div>
+                        </section>
+                    </div>
+                )}
+
+                {/* NAVIGATION */}
+                {activeTab === 'navigation' && (
+                    <div className="space-y-4 animate-in slide-in-from-right-4 duration-300">
+                        <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Sidebar Shortcuts</h3>
+                        <HotkeyButton label="Go to Timer" value={navHotkeys?.timer} listenId="nav-timer" />
+                        <HotkeyButton label="Go to Stats" value={navHotkeys?.stats} listenId="nav-stats" />
+                        <HotkeyButton label="Go to Cublet" value={navHotkeys?.cublet} listenId="nav-cublet" />
+                        <HotkeyButton label="Go to Settings" value={navHotkeys?.settings} listenId="nav-settings" />
+                    </div>
+                )}
+            </div>
         </div>
     );
 }
