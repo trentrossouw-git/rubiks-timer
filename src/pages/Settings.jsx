@@ -1,156 +1,234 @@
 import React, { useState, useEffect } from 'react';
-import { X, Keyboard, Hand, Palette, Settings as SettingsIcon } from 'lucide-react';
+import { X, Keyboard, Hand, Palette, Timer, Monitor, Sun, Moon, Eye, EyeOff } from 'lucide-react';
 
-// Define explicit classes for each color to ensure Tailwind generates them
 const COLOR_VARIANTS = {
-    indigo: {
-        active: 'bg-indigo-500 border-indigo-400 shadow-[0_0_15px_rgba(99,102,241,0.4)] scale-105 ring-2 ring-indigo-500/20',
-        inactive: 'bg-indigo-900/40 border-indigo-500/50 hover:bg-indigo-500/40 hover:border-indigo-400'
-    },
-    emerald: {
-        active: 'bg-emerald-500 border-emerald-400 shadow-[0_0_15px_rgba(16,185,129,0.4)] scale-105 ring-2 ring-emerald-500/20',
-        inactive: 'bg-emerald-900/40 border-emerald-500/50 hover:bg-emerald-500/40 hover:border-emerald-400'
-    },
-    rose: {
-        active: 'bg-rose-500 border-rose-400 shadow-[0_0_15px_rgba(244,63,94,0.4)] scale-105 ring-2 ring-rose-500/20',
-        inactive: 'bg-rose-900/40 border-rose-500/50 hover:bg-rose-500/40 hover:border-rose-400'
-    },
-    amber: {
-        active: 'bg-amber-500 border-amber-400 shadow-[0_0_15px_rgba(245,158,11,0.4)] scale-105 ring-2 ring-amber-500/20',
-        inactive: 'bg-amber-900/40 border-amber-500/50 hover:bg-amber-500/40 hover:border-amber-400'
-    }
+    indigo: { active: 'bg-indigo-500 border-indigo-400', inactive: 'bg-indigo-500/20 border-indigo-500/40' },
+    emerald: { active: 'bg-emerald-500 border-emerald-400', inactive: 'bg-emerald-500/20 border-emerald-500/40' },
+    rose: { active: 'bg-rose-500 border-rose-400', inactive: 'bg-rose-500/20 border-rose-500/40' },
+    amber: { active: 'bg-amber-500 border-amber-400', inactive: 'bg-amber-500/20 border-amber-500/40' }
 };
 
 export default function Settings({ 
     onBack, 
-    themeColor, 
-    setThemeColor, 
-    useInspection, 
-    setUseInspection,
-    inspectionHotkey,
-    setInspectionHotkey
+    themeColor, setThemeColor,
+    isDarkMode, setIsDarkMode,
+    showVisualizer, setShowVisualizer,
+    useInspection, setUseInspection,
+    inspectionHotkey, setInspectionHotkey,
+    timerHotkey, setTimerHotkey,
+    holdDuration, setHoldDuration
 }) {
-    const [isListening, setIsListening] = useState(false);
+    const [activeTab, setActiveTab] = useState('appearance');
+    const [listeningFor, setListeningFor] = useState(null); // 'inspection' or 'timer' or null
 
-    // Handle keys: Recording hotkey OR closing settings with 'S'
+    // Key Listener for Hotkeys
     useEffect(() => {
         const handleKeyDown = (e) => {
-            if (isListening) {
+            if (listeningFor) {
                 e.preventDefault();
-                if(e.code === "Space") { 
-                    setIsListening(false);
-                    return;
-                }
-                setInspectionHotkey(e.code);
-                setIsListening(false);
+                const code = e.code;
+                
+                if (listeningFor === 'inspection') setInspectionHotkey(code);
+                if (listeningFor === 'timer') setTimerHotkey(code);
+                
+                setListeningFor(null);
                 return;
             }
-
-            // Close settings if 'S' or 'Escape' is pressed
-            if (e.key.toLowerCase() === 's' || e.code === 'Escape') {
-                onBack();
-            }
+            if (e.key.toLowerCase() === 's' || e.code === 'Escape') onBack();
         };
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isListening, setInspectionHotkey, onBack]);
+    }, [listeningFor, setInspectionHotkey, setTimerHotkey, onBack]);
 
-    const activeText = `text-${themeColor}-400`;
-    
-    // Explicit Glassy Switch Styles
-    const getSwitchStyle = () => {
-        if (!useInspection) return 'bg-gray-700';
-        switch(themeColor) {
-            case 'indigo': return 'bg-indigo-500/30 border border-indigo-500 shadow-[0_0_10px_rgba(99,102,241,0.3)]';
-            case 'emerald': return 'bg-emerald-500/30 border border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]';
-            case 'rose': return 'bg-rose-500/30 border border-rose-500 shadow-[0_0_10px_rgba(244,63,94,0.3)]';
-            case 'amber': return 'bg-amber-500/30 border border-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.3)]';
-            default: return 'bg-indigo-500/30 border border-indigo-500';
-        }
+    // Helpers
+    const activeText = `text-${themeColor}-500`;
+    const getSwitchStyle = (isActive) => {
+        if (!isActive) return isDarkMode ? 'bg-gray-700' : 'bg-gray-300';
+        return `bg-${themeColor}-500 shadow-[0_0_10px_rgba(var(--color-${themeColor}-500),0.4)]`;
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            {/* Modal Container */}
-            <div className="w-full max-w-md bg-[#0f1115] border border-gray-800 rounded-2xl shadow-2xl overflow-hidden transform transition-all scale-100 ring-1 ring-white/5">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className={`w-full max-w-2xl h-[500px] flex rounded-2xl shadow-2xl overflow-hidden border ${isDarkMode ? 'bg-[#0f1115] border-gray-800' : 'bg-white border-gray-200'}`}>
                 
-                {/* Header */}
-                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-800 bg-[#13161c]">
-                    <h2 className="text-lg font-bold text-gray-100 flex items-center gap-2">
-                        <SettingsIcon size={18} className={activeText} />
-                        Preferences
-                    </h2>
-                    <button onClick={onBack} className="p-2 text-gray-500 hover:text-white hover:bg-gray-800 rounded-lg transition-colors cursor-pointer">
-                        <X size={18} />
+                {/* --- SIDEBAR --- */}
+                <div className={`w-1/3 border-r p-4 flex flex-col gap-2 ${isDarkMode ? 'bg-[#13161c] border-gray-800' : 'bg-gray-50 border-gray-200'}`}>
+                    <h2 className={`text-xs font-bold uppercase tracking-widest mb-4 pl-3 ${isDarkMode ? 'text-gray-500' : 'text-gray-400'}`}>Settings</h2>
+                    
+                    <button 
+                        onClick={() => setActiveTab('appearance')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'appearance' 
+                            ? (isDarkMode ? `bg-white/5 text-${themeColor}-400` : `bg-black/5 text-${themeColor}-600`) 
+                            : (isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-black hover:bg-black/5')}`}
+                    >
+                        <Palette size={18} /> Appearance
                     </button>
+
+                    <button 
+                        onClick={() => setActiveTab('timer')}
+                        className={`flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${activeTab === 'timer' 
+                            ? (isDarkMode ? `bg-white/5 text-${themeColor}-400` : `bg-black/5 text-${themeColor}-600`) 
+                            : (isDarkMode ? 'text-gray-400 hover:text-white hover:bg-white/5' : 'text-gray-500 hover:text-black hover:bg-black/5')}`}
+                    >
+                        <Timer size={18} /> Timer
+                    </button>
+                    
+                    <div className="mt-auto">
+                         <button onClick={onBack} className={`w-full py-3 rounded-xl text-xs font-bold uppercase tracking-widest border transition-all ${isDarkMode ? 'border-gray-800 text-gray-500 hover:border-gray-700 hover:text-white' : 'border-gray-200 text-gray-400 hover:border-gray-300 hover:text-black'}`}>
+                            Close (S)
+                         </button>
+                    </div>
                 </div>
 
-                {/* Body */}
-                <div className="p-6 space-y-8">
+                {/* --- CONTENT AREA --- */}
+                <div className={`flex-1 p-8 overflow-y-auto ${isDarkMode ? 'text-gray-200' : 'text-gray-800'}`}>
                     
-                    {/* Inspection Section */}
-                    <div>
-                        <h3 className="text-[10px] font-bold text-gray-500 mb-3 border-b border-gray-700 pb-1 uppercase tracking-widest flex items-center gap-2">
-                            <Hand size={12} /> WCA Inspection
-                        </h3>
-                        <div className="space-y-4">
-                            <div 
-                                onClick={() => setUseInspection(!useInspection)}
-                                className="flex items-center justify-between bg-gray-900/50 p-4 rounded-xl border border-gray-700/50 cursor-pointer hover:bg-gray-900 hover:border-gray-600 transition-all group"
-                            >
-                                <div>
-                                    <span className="block text-sm font-medium text-gray-200 group-hover:text-white transition-colors">Enable Inspection</span>
-                                    <span className="text-[10px] text-gray-500 uppercase tracking-wide">15s countdown</span>
+                    {/* APPEARANCE TAB */}
+                    {activeTab === 'appearance' && (
+                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                            {/* Color Picker */}
+                            <section>
+                                <h3 className="text-[10px] font-bold text-gray-400 mb-4 uppercase tracking-widest">Accent Color</h3>
+                                <div className="grid grid-cols-4 gap-3">
+                                    {Object.keys(COLOR_VARIANTS).map(color => (
+                                        <button
+                                            key={color}
+                                            onClick={() => setThemeColor(color)}
+                                            className={`h-12 rounded-xl border-2 transition-all duration-200 ${
+                                                themeColor === color 
+                                                ? COLOR_VARIANTS[color].active + ' scale-105 shadow-lg'
+                                                : COLOR_VARIANTS[color].inactive + ' hover:opacity-100 opacity-60'
+                                            }`}
+                                        />
+                                    ))}
                                 </div>
-                                
-                                {/* Animated Switch with Glass Effect */}
-                                <div className={`w-11 h-6 rounded-full relative transition-all duration-300 ease-in-out ${getSwitchStyle()}`}>
-                                    <div 
-                                        className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full shadow-md transition-transform duration-300 ease-[cubic-bezier(0.4,0.0,0.2,1)] ${useInspection ? 'translate-x-5' : 'translate-x-0'}`}
-                                    />
-                                </div>
-                            </div>
+                            </section>
 
-                            {useInspection && (
-                                <div className="animate-in slide-in-from-top-2 duration-300 ease-out pl-1">
-                                    <span className="block text-[10px] text-gray-500 mb-2 uppercase tracking-wider font-semibold">Start/Cancel Hotkey</span>
+                            {/* Dark/Light Mode */}
+                            <section className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    {isDarkMode ? <Moon size={20} className={activeText} /> : <Sun size={20} className="text-orange-400" />}
+                                    <div>
+                                        <span className="block text-sm font-medium">Dark Mode</span>
+                                        <span className="text-[10px] text-gray-500 uppercase">Adjust interface brightness</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setIsDarkMode(!isDarkMode)}
+                                    className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${isDarkMode ? `bg-${themeColor}-500` : 'bg-gray-300'}`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${isDarkMode ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                            </section>
+
+                            {/* Visualizer Toggle */}
+                            <section className="flex items-center justify-between">
+                                <div className="flex items-center gap-3">
+                                    {showVisualizer ? <Eye size={20} className={activeText} /> : <EyeOff size={20} className="text-gray-400" />}
+                                    <div>
+                                        <span className="block text-sm font-medium">3D Cube Visualizer</span>
+                                        <span className="text-[10px] text-gray-500 uppercase">Show rendered cube state</span>
+                                    </div>
+                                </div>
+                                <button 
+                                    onClick={() => setShowVisualizer(!showVisualizer)}
+                                    className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${showVisualizer ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}
+                                >
+                                    <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${showVisualizer ? 'translate-x-5' : 'translate-x-0'}`} />
+                                </button>
+                            </section>
+                        </div>
+                    )}
+
+                    {/* TIMER TAB */}
+                    {activeTab === 'timer' && (
+                        <div className="space-y-8 animate-in slide-in-from-right-4 duration-300">
+                            
+                            {/* Inspection Toggle */}
+                            <section>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div className="flex items-center gap-3">
+                                        <Hand size={20} className={useInspection ? activeText : 'text-gray-400'} />
+                                        <div>
+                                            <span className="block text-sm font-medium">WCA Inspection</span>
+                                            <span className="text-[10px] text-gray-500 uppercase">15s countdown before solve</span>
+                                        </div>
+                                    </div>
                                     <button 
-                                        onClick={() => setIsListening(true)}
-                                        className={`w-full flex items-center justify-between bg-gray-900 border text-sm py-3 px-4 rounded-xl transition-all cursor-pointer ${isListening ? `border-${themeColor}-500/50 ring-1 ring-${themeColor}-500/50 bg-${themeColor}-500/10 text-${themeColor}-200` : 'border-gray-700 text-gray-300 hover:border-gray-500 hover:text-white'}`}
+                                        onClick={() => setUseInspection(!useInspection)}
+                                        className={`w-12 h-7 rounded-full relative transition-colors duration-300 ${useInspection ? `bg-${themeColor}-500` : (isDarkMode ? 'bg-gray-700' : 'bg-gray-300')}`}
                                     >
-                                        <span className="font-mono font-medium">
-                                            {isListening ? 'Press any key...' : (inspectionHotkey ? inspectionHotkey.replace('Key', '') : 'Not Set')}
-                                        </span>
-                                        <Keyboard size={16} className={isListening ? 'animate-pulse text-white' : 'text-gray-500'} />
+                                        <div className={`absolute top-1 left-1 w-5 h-5 bg-white rounded-full shadow-md transition-transform duration-300 ${useInspection ? 'translate-x-5' : 'translate-x-0'}`} />
                                     </button>
                                 </div>
-                            )}
-                        </div>
-                    </div>
-                    
-                    {/* Theme Section */}
-                    <div>
-                        <h3 className="text-[10px] font-bold text-gray-500 mb-3 border-b border-gray-700 pb-1 uppercase tracking-widest flex items-center gap-2">
-                            <Palette size={12} /> Interface Theme
-                        </h3>
-                        <div className="grid grid-cols-4 gap-3">
-                            {Object.keys(COLOR_VARIANTS).map(color => (
-                                <button
-                                    key={color}
-                                    onClick={() => setThemeColor(color)}
-                                    className={`h-10 rounded-lg border transition-all duration-300 ${
-                                        themeColor === color 
-                                        ? COLOR_VARIANTS[color].active
-                                        : COLOR_VARIANTS[color].inactive
-                                    }`}
-                                />
-                            ))}
-                        </div>
-                    </div>
+                                
+                                {useInspection && (
+                                    <button 
+                                        onClick={() => setListeningFor('inspection')}
+                                        className={`w-full flex items-center justify-between border text-sm py-3 px-4 rounded-xl transition-all ${listeningFor === 'inspection' ? `border-${themeColor}-500 text-${themeColor}-500 bg-${themeColor}-500/10` : (isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50')}`}
+                                    >
+                                        <span className="font-medium">Inspection Hotkey</span>
+                                        <div className="flex items-center gap-2 font-mono text-xs opacity-70">
+                                            {listeningFor === 'inspection' ? 'Press key...' : inspectionHotkey.replace('Key', '')}
+                                            <Keyboard size={14} />
+                                        </div>
+                                    </button>
+                                )}
+                            </section>
 
+                            <hr className={isDarkMode ? 'border-gray-800' : 'border-gray-200'} />
+
+                            {/* Timer Hotkey */}
+                            <section>
+                                <button 
+                                    onClick={() => setListeningFor('timer')}
+                                    className={`w-full flex items-center justify-between border text-sm py-3 px-4 rounded-xl transition-all mb-4 ${listeningFor === 'timer' ? `border-${themeColor}-500 text-${themeColor}-500 bg-${themeColor}-500/10` : (isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50')}`}
+                                >
+                                    <div className="flex flex-col items-start">
+                                        <span className="font-medium">Start Timer Hotkey</span>
+                                        <span className="text-[10px] opacity-50 uppercase">Key to hold and release</span>
+                                    </div>
+                                    <div className="flex items-center gap-2 font-mono text-xs opacity-70">
+                                        {listeningFor === 'timer' ? 'Press key...' : timerHotkey.replace('Key', '')}
+                                        <Keyboard size={14} />
+                                    </div>
+                                </button>
+                            </section>
+
+                            {/* Hold Duration */}
+                            <section className="flex items-center justify-between">
+                                <div className="flex flex-col">
+                                    <span className="text-sm font-medium">Hold Duration (ms)</span>
+                                    <span className="text-[10px] text-gray-500 uppercase">Time to hold before ready</span>
+                                </div>
+                                <div className={`relative w-24 rounded-xl border overflow-hidden ${isDarkMode ? 'border-gray-800 bg-gray-900' : 'border-gray-200 bg-gray-50'}`}>
+                                    <input 
+                                        type="number"
+                                        value={holdDuration}
+                                        onChange={(e) => setHoldDuration(e.target.value)}
+                                        placeholder="550"
+                                        className={`w-full h-10 px-3 text-center bg-transparent outline-none font-mono text-sm no-spinner ${isDarkMode ? 'text-white placeholder-gray-700' : 'text-black placeholder-gray-300'}`}
+                                    />
+                                </div>
+                            </section>
+
+                        </div>
+                    )}
                 </div>
             </div>
+            
+            {/* CSS to hide spinner arrows on number input */}
+            <style jsx>{`
+                .no-spinner::-webkit-inner-spin-button, 
+                .no-spinner::-webkit-outer-spin-button { 
+                    -webkit-appearance: none; 
+                    margin: 0; 
+                }
+                .no-spinner { 
+                    -moz-appearance: textfield; 
+                }
+            `}</style>
         </div>
     );
 }
