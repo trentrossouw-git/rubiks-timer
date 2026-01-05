@@ -1,45 +1,14 @@
+// src/pages/cublet/Cublet.jsx
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { createPortal } from 'react-dom';
-import { motion, AnimatePresence, useMotionValue, useSpring } from 'framer-motion';
-import { Trophy, Move3d, Sparkles, Zap, ArrowDown, Edit2, Check, X, Wallet, Trash2, RotateCw, ChevronUp } from 'lucide-react';
-import useLocalStorage from '../hooks/useLocalStorage';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Trophy, Move3d, Sparkles, ArrowDown, Edit2, Check, X, Wallet, Trash2, RotateCw, ChevronUp } from 'lucide-react';
 
-// --- CONFIGURATION ---
-const FEED_COST = 5;
-const XP_PER_FEED = 25;
-const XP_BASE_REQ = 100;
-const CUBIE_SIZE = 36; 
-const DROP_ZONE_RADIUS = 100;
+// Adjusted path: Go up two levels (../..) to get out of pages/cublet to find hooks
+import useLocalStorage from '../../hooks/useLocalStorage';
 
-const CUBE_COLORS = {
-    top: '#ffffff',    // White
-    bottom: '#fbbf24', // Yellow
-    front: '#22c55e',  // Green
-    back: '#3b82f6',   // Blue
-    left: '#f97316',   // Orange
-    right: '#ef4444'   // Red
-};
-
-// Size Thresholds
-const getCubletStage = (level) => {
-    if (level === 0) return { size: 1, stageName: "Cublet Egg" };
-    if (level < 8) return { size: 2, stageName: "Rookie Cube" };  
-    if (level < 27) return { size: 3, stageName: "Speed Cube" };  
-    return { size: 4, stageName: "Master Cube" };                 
-};
-
-// Generate a random valid 90-degree rotation
-const generatePieceRotation = (seed) => {
-    const axes = [0, 90, 180, 270];
-    const r1 = (seed * 9301 + 49297) % 233280;
-    const r2 = (seed * 1231 + 4566) % 233280;
-    const r3 = (seed * 888 + 999) % 233280;
-    return {
-        rotateX: axes[r1 % 4],
-        rotateY: axes[r2 % 4],
-        rotateZ: axes[r3 % 4]
-    };
-};
+import CubletAvatar from './CubletAvatar';
+import FoodDraggable from './FoodDraggable';
+import { FEED_COST, XP_PER_FEED, XP_BASE_REQ, DROP_ZONE_RADIUS, getCubletStage, generatePieceRotation } from './CubletUtils';
 
 export default function Cublet({ isDarkMode, wallet, setWallet }) {
     const [view, setView] = useState('main'); 
@@ -50,7 +19,7 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
     
     // VISUAL & ANIMATION STATE
     const [visualLevel, setVisualLevel] = useState(cubletData.level);
-    const [evolutionPhase, setEvolutionPhase] = useState('idle'); // 'idle' | 'ready-to-solve' | 'solving' | 'ready-to-upgrade'
+    const [evolutionPhase, setEvolutionPhase] = useState('idle'); 
     
     // UI STATE
     const [isEating, setIsEating] = useState(false);
@@ -111,9 +80,8 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         setIsEditingName(false);
     };
 
-    // --- MAIN ACTION HANDLER (Feed / Solve / Upgrade) ---
+    // --- MAIN ACTION HANDLER ---
     const handleMainAction = () => {
-        // 1. If Normal Phase -> Dispense Food
         if (evolutionPhase === 'idle') {
             const totalCost = FEED_COST * feedMultiplier;
             if (wallet.cubes < totalCost) return;
@@ -123,19 +91,17 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
             return;
         }
 
-        // 2. If Ready to Solve -> Start Solving Animation
         if (evolutionPhase === 'ready-to-solve') {
             setEvolutionPhase('solving');
             setTimeout(() => {
                 setEvolutionPhase('ready-to-upgrade');
-            }, 2500); // Wait for solve animation
+            }, 2500); 
             return;
         }
 
-        // 3. If Ready to Upgrade -> Trigger Size Increase
         if (evolutionPhase === 'ready-to-upgrade') {
-            setVisualLevel(prev => prev + 1); // This bumps the visual size
-            setEvolutionPhase('idle'); // Reset to scrambling state
+            setVisualLevel(prev => prev + 1); 
+            setEvolutionPhase('idle'); 
             setLevelUpType(null);
             return;
         }
@@ -143,7 +109,7 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
 
     // --- DRAG LOGIC ---
     const startDrag = (e) => {
-        if (evolutionPhase !== 'idle') return; // Disable drag during evolution
+        if (evolutionPhase !== 'idle') return; 
         e.preventDefault(); 
         setIsDraggingFood(true);
         const clientX = e.touches ? e.touches[0].clientX : e.clientX;
@@ -200,26 +166,21 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
             
             if (newXp >= xpRequired) {
                 newXp = newXp - xpRequired;
-                newLevel += 1; // Real level goes up
+                newLevel += 1; 
                 
                 const oldStage = getCubletStage(prev.level);
                 const newStage = getCubletStage(newLevel);
                 
-                // If this level up causes a size change...
                 if (newStage.size > oldStage.size) {
-                    // Enter Evolution Flow
-                    // We DO NOT update visualLevel yet. We wait for user interaction.
                     setEvolutionPhase('ready-to-solve');
-                    setLevelUpType('evolve'); // shows "SOLVE ME" text or similar
+                    setLevelUpType('evolve'); 
                 } else {
-                    // Standard Level Up (just pieces unlocking)
                     setVisualLevel(newLevel); 
                     triggerLevelUpEffect('piece');
                 }
             } else {
                 setVisualLevel(newLevel); 
             }
-            
             return { ...prev, xp: newXp, level: newLevel, totalFed: prev.totalFed + feedMultiplier };
         });
     };
@@ -229,29 +190,15 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         setTimeout(() => setLevelUpType(null), 2500);
     };
 
-    // Helper to determine button text/state
     const getMainButtonProps = () => {
         switch(evolutionPhase) {
             case 'ready-to-solve':
-                return { 
-                    text: "Solve Cube", 
-                    icon: <RotateCw size={20} />, 
-                    color: "bg-green-500 hover:bg-green-400 text-white" 
-                };
+                return { text: "Solve Cube", icon: <RotateCw size={20} />, color: "bg-green-500 hover:bg-green-400 text-white" };
             case 'solving':
-                return { 
-                    text: "Solving...", 
-                    icon: <RotateCw size={20} className="animate-spin" />, 
-                    color: "bg-green-600 text-white cursor-wait",
-                    disabled: true
-                };
+                return { text: "Solving...", icon: <RotateCw size={20} className="animate-spin" />, color: "bg-green-600 text-white cursor-wait", disabled: true };
             case 'ready-to-upgrade':
-                return { 
-                    text: "Upgrade Size", 
-                    icon: <ChevronUp size={20} />, 
-                    color: "bg-purple-600 hover:bg-purple-500 text-white" 
-                };
-            default: // idle
+                return { text: "Upgrade Size", icon: <ChevronUp size={20} />, color: "bg-purple-600 hover:bg-purple-500 text-white" };
+            default: 
                 return { 
                     text: hasFoodItem ? "Feed!" : "Dispense", 
                     icon: <ArrowDown size={20} />, 
@@ -363,7 +310,6 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
                                     containerRef={containerRef}
                                     stageInfo={stageInfo}
                                     isEating={isEating}
-                                    // Solved if we are solving OR waiting to upgrade
                                     isSolving={evolutionPhase === 'solving' || evolutionPhase === 'ready-to-upgrade'}
                                     isDraggingFood={isDraggingFood}
                                     hasFoodItem={hasFoodItem}
@@ -465,243 +411,3 @@ export default function Cublet({ isDarkMode, wallet, setWallet }) {
         </div>
     );
 }
-
-// --- EXTRACTED COMPONENT ---
-const CubletAvatar = ({ containerRef, stageInfo, isEating, isSolving, isDraggingFood, hasFoodItem, piecesColored, scrambleMap, isDarkMode }) => {
-    const { size } = stageInfo;
-    const containerSize = size * CUBIE_SIZE;
-    const faceDepth = (size * CUBIE_SIZE) / 2;
-
-    const rotateX = useMotionValue(-20);
-    const rotateY = useMotionValue(30);
-    const rotateXSpring = useSpring(rotateX, { stiffness: 120, damping: 20 });
-    const rotateYSpring = useSpring(rotateY, { stiffness: 120, damping: 20 });
-
-    const [isRotating, setIsRotating] = useState(false);
-    const lastPos = useRef({ x: 0, y: 0 });
-
-    const handlePointerDown = (e) => {
-        if (isDraggingFood) return; 
-        setIsRotating(true);
-        lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const handlePointerMove = (e) => {
-        if (!isRotating) return;
-        e.preventDefault();
-        const deltaX = e.clientX - lastPos.current.x;
-        const deltaY = e.clientY - lastPos.current.y;
-        rotateY.set(rotateY.get() + deltaX * 0.5); 
-        rotateX.set(rotateX.get() - deltaY * 0.5);
-        lastPos.current = { x: e.clientX, y: e.clientY };
-    };
-
-    const cubies = [];
-    let count = 0;
-    for (let z = 0; z < size; z++) {
-        for (let y = 0; y < size; y++) {
-            for (let x = 0; x < size; x++) {
-                const isUnlocked = count < piecesColored; 
-                const rotation = scrambleMap[`${x}-${y}-${z}`] || {rotateX:0, rotateY:0, rotateZ:0};
-                cubies.push(
-                    <Cubie 
-                        key={`${x}-${y}-${z}`} x={x} y={y} z={z} size={size} 
-                        isUnlocked={isUnlocked} isDarkMode={isDarkMode}
-                        rotation={rotation}
-                        isSolving={isSolving}
-                    />
-                );
-                count++;
-            }
-        }
-    }
-
-    const isHappyMode = hasFoodItem || isDraggingFood || isEating;
-    const faceState = isHappyMode ? 'happy' : 'idle';
-
-    return (
-        <div 
-            ref={containerRef}
-            className="relative flex items-center justify-center touch-none"
-            style={{ 
-                perspective: '1000px', width: '260px', height: '260px',
-                cursor: isRotating ? 'grabbing' : 'grab' 
-            }}
-            onPointerDown={handlePointerDown}
-            onPointerMove={handlePointerMove}
-            onPointerUp={() => setIsRotating(false)}
-            onPointerLeave={() => setIsRotating(false)}
-        >
-            <motion.div 
-                animate={
-                    isSolving ? { scale: [1, 1.1, 1], rotateY: [0, 360, 0] } :
-                    isEating ? { rotateZ: [0, -5, 5, -2, 2, 0], scale: [1, 1.15, 1] } : 
-                    { y: [0, -10, 0] } 
-                }
-                transition={
-                    isSolving ? { duration: 2.5, ease: "easeInOut" } :
-                    isEating ? { duration: 0.6, ease: "backOut" } :
-                    { duration: 4, repeat: Infinity, ease: "easeInOut" }
-                }
-                className="relative transition-transform duration-200"
-                style={{ 
-                    width: containerSize, height: containerSize,
-                    transformStyle: 'preserve-3d',
-                    rotateX: rotateXSpring, rotateY: rotateYSpring
-                }}
-            >
-                {cubies}
-                
-                {/* FACE - Hidden during solve to emphasize mechanical action */}
-                {!isSolving && (
-                    <div 
-                        className="absolute flex flex-col items-center justify-center z-50 pointer-events-none origin-center"
-                        style={{
-                            transform: `translateZ(${faceDepth + 10}px) scale(${size === 1 ? 0.35 : 1})`, 
-                            left: '50%', top: '50%', width: '100px', height: '60px',
-                            marginLeft: '-50px', marginTop: '-30px',
-                            backfaceVisibility: 'hidden'
-                        }}
-                    >
-                        <div className="flex gap-4 mb-2">
-                            <Eye isHappy={faceState === 'happy'} />
-                            <Eye isHappy={faceState === 'happy'} />
-                        </div>
-                        <Mouth isHappy={faceState === 'happy'} />
-                    </div>
-                )}
-            </motion.div>
-        </div>
-    );
-};
-
-// --- DRAGGABLE FOOD ---
-const FoodDraggable = ({ x, y, multiplier }) => {
-    if (typeof document === 'undefined') return null;
-    const scale = 1 + (multiplier * 0.05);
-
-    return createPortal(
-        <div 
-            className="fixed z-[9999] pointer-events-none select-none" 
-            style={{ 
-                top: 0, left: 0,
-                transform: `translate3d(${x}px, ${y}px, 0) translate3d(-50%, -50%, 0) scale(${scale})`,
-                width: '30px', height: '30px'
-            }}
-            onDragStart={(e) => e.preventDefault()}
-        >
-            <motion.div
-                animate={{ rotateX: [0, 360], rotateY: [0, 360] }}
-                transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-                style={{ transformStyle: 'preserve-3d', width: '100%', height: '100%' }}
-            >
-                {[0, 90, 180, 270].map(deg => (
-                    <div key={deg} className="absolute w-full h-full bg-blue-500/90 border border-blue-200 shadow-[0_0_10px_blue]" style={{ transform: `rotateY(${deg}deg) translateZ(15px)` }} />
-                ))}
-                <div className="absolute w-full h-full bg-blue-500/90 border border-blue-200" style={{ transform: 'rotateX(90deg) translateZ(15px)' }} />
-                <div className="absolute w-full h-full bg-blue-500/90 border border-blue-200" style={{ transform: 'rotateX(-90deg) translateZ(15px)' }} />
-            </motion.div>
-        </div>,
-        document.body
-    );
-};
-
-// --- MOUTH ---
-const Mouth = ({ isHappy }) => {
-    return (
-        <motion.div
-            className="bg-black rounded-full overflow-hidden border-2 border-gray-900/20"
-            animate={isHappy ? { width: 24, height: 24, borderRadius: '50%', backgroundColor: '#000' } : { width: 10, height: 5, borderRadius: 20, backgroundColor: '#374151' }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        />
-    );
-};
-
-// --- EYE ---
-const Eye = ({ isHappy }) => {
-    return (
-        <div className="relative w-8 h-8 bg-white rounded-full overflow-hidden shadow-sm border-2 border-gray-900 flex items-center justify-center">
-            <AnimatePresence>
-                {isHappy ? (
-                    <motion.div key="happy" initial={{ scale: 0.5, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-center justify-center">
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" className="text-gray-900 translate-y-1"><path d="M 4 14 Q 12 4 20 14" /></svg>
-                    </motion.div>
-                ) : (
-                    <motion.div key="normal" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="absolute inset-0 flex items-center justify-center">
-                        <div className="w-5 h-5 bg-gray-900 rounded-full relative"><div className="absolute top-1 right-1 w-2 h-2 bg-white rounded-full opacity-90" /></div>
-                        <motion.div className="absolute top-0 left-0 w-full bg-gray-900 z-10" initial={{ height: "0%" }} animate={{ height: ["0%", "100%", "0%", "0%", "0%"] }} transition={{ duration: 3.5, times: [0, 0.05, 0.1, 0.15, 1], repeat: Infinity }} />
-                    </motion.div>
-                )}
-            </AnimatePresence>
-        </div>
-    );
-};
-
-// --- CUBIE (Standard) ---
-const Cubie = ({ x, y, z, size, isUnlocked, isDarkMode, rotation, isSolving }) => {
-    const offset = (size * CUBIE_SIZE) / 2 - (CUBIE_SIZE / 2);
-    const xPos = x * CUBIE_SIZE - offset;
-    const yPos = y * CUBIE_SIZE - offset;
-    const zPos = z * CUBIE_SIZE - offset;
-    
-    const greyFill = isDarkMode ? '#4b5563' : '#d1d5db'; 
-    const internalBlack = '#1a1a1a'; 
-
-    const getFaceColor = (faceType) => {
-        if (!isUnlocked) return greyFill; 
-        switch (faceType) {
-            case 'top': return CUBE_COLORS.top;
-            case 'bottom': return CUBE_COLORS.bottom;
-            case 'front': return CUBE_COLORS.front;
-            case 'back': return CUBE_COLORS.back;
-            case 'right': return CUBE_COLORS.right;
-            case 'left': return CUBE_COLORS.left;
-            default: return internalBlack;
-        }
-    };
-
-    const faceStyle = (faceType, transform) => {
-        const color = getFaceColor(faceType);
-        
-        // FIX: Ensure GREY pieces also get borders so they don't look like a merged blob
-        const isInternal = color === internalBlack;
-        
-        return {
-            position: 'absolute', width: `${CUBIE_SIZE}px`, height: `${CUBIE_SIZE}px`,
-            boxSizing: 'border-box', borderRadius: '6px', 
-            // Apply border if NOT internal (shows for both Colored and Grey)
-            border: `2px solid ${isInternal ? 'transparent' : (isDarkMode ? '#000' : 'rgba(0,0,0,0.15)')}`, 
-            backgroundColor: color,
-            boxShadow: !isInternal ? 'inset 0 0 8px rgba(0,0,0,0.15)' : 'none',
-            transform: transform, backfaceVisibility: 'hidden', 
-        };
-    };
-    
-    const halfSize = CUBIE_SIZE / 2;
-
-    const animateState = isSolving 
-        ? { rotateX: 0, rotateY: 0, rotateZ: 0 } 
-        : { rotateX: rotation.rotateX, rotateY: rotation.rotateY, rotateZ: rotation.rotateZ };
-
-    return (
-        <motion.div
-            initial={false} 
-            animate={animateState}
-            transition={{ duration: isSolving ? 2.0 : 0, ease: "easeInOut" }}
-            style={{
-                position: 'absolute', top: '50%', left: '50%',
-                width: `${CUBIE_SIZE}px`, height: `${CUBIE_SIZE}px`,
-                transformStyle: 'preserve-3d',
-                x: xPos, y: -yPos, z: zPos, scale: 0.96,
-                marginTop: `-${CUBIE_SIZE / 2}px`, marginLeft: `-${CUBIE_SIZE / 2}px`,
-            }}
-        >
-            <div style={faceStyle('front',  `translateZ(${halfSize}px)`)} />
-            <div style={faceStyle('back',   `rotateY(180deg) translateZ(${halfSize}px)`)} />
-            <div style={faceStyle('right',  `rotateY(90deg) translateZ(${halfSize}px)`)} />
-            <div style={faceStyle('left',   `rotateY(-90deg) translateZ(${halfSize}px)`)} />
-            <div style={faceStyle('top',    `rotateX(90deg) translateZ(${halfSize}px)`)} />
-            <div style={faceStyle('bottom', `rotateX(-90deg) translateZ(${halfSize}px)`)} />
-        </motion.div>
-    );
-};

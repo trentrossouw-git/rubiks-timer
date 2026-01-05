@@ -5,7 +5,7 @@ import CubeTimer from './components/CubeTimer';
 import CubeVisualizer from './components/CubeVisualizer';
 import Settings from './pages/Settings';
 import Stats from './pages/Stats';
-import Cublet from './pages/Cublet'; // <--- MAKE SURE THIS IMPORT EXISTS
+import Cublet from './pages/Cublet/Cublet'; // <--- MAKE SURE THIS IMPORT EXISTS
 import { STD_SOLVED } from './utils/constants';
 import { generateRandomMoves, applyMove, cloneCube } from './utils/cubeLogic';
 import { calculateStats } from './utils/statsLogic';
